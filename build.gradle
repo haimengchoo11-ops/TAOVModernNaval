@@ -1,0 +1,68 @@
+plugins {
+    id 'eclipse'
+    id 'idea'
+    id 'maven-publish'
+    id 'net.minecraftforge.gradle' version '[5.1, 6)'
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+
+version = '1.0.0-SNAPSHOT'
+group = 'TAOVMN'
+
+base {
+    archivesName = 'taovmodernnaval'
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+
+minecraft {
+    mappings channel: 'official', version: '1.20.1'
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                taovmodernnaval {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    maven { url = 'https://maven.minecraftforge.net' }
+    maven { url = 'https://maven.blamejared.com' }
+    maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' }
+    mavenCentral()
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.3.0'
+    compileOnly 'mezz.jei:jei-1.20.1-forge-api:15.3.0.4'
+    runtimeOnly fg.deobf('mezz.jei:jei-1.20.1-forge:15.3.0.4')
+    implementation fg.deobf('software.bernie.geckolib:geckolib-forge-1.20.1:4.7')
+    compileOnly files('libs/createbigcannons-5.8.3edited.jar')
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    var replaceProperties = [
+        minecraft_version: '1.20.1',
+        minecraft_version_range: '[1.20.1,1.21)',
+        forge_version: '47.3.0',
+        forge_version_range: '[47,)',
+        loader_version_range: '[47,)',
+        mod_id: 'taovmodernnaval',
+        mod_name: 'TAOVModernNaval',
+        mod_license: 'MIT',
+        mod_version: project.version,
+        mod_authors: 'choohaimeng',
+        mod_description: 'A modern naval warfare mod for Minecraft'
+    ]
+    inputs.properties replaceProperties
+
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand replaceProperties
+    }
+}

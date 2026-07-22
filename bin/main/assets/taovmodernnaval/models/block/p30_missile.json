@@ -1,0 +1,7 @@
+{
+  "parent": "taovmodernnaval:block/missile_template",
+  "textures": {
+    "0": "taovmodernnaval:item/p30_missile",
+    "particle": "taovmodernnaval:item/p30_missile"
+  }
+}

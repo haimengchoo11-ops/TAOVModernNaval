@@ -1,0 +1,9 @@
+{
+  "format_version": "1.8.0",
+  "animations": {
+    "animation.rak_launcher.idle": {
+      "loop": true,
+      "bones": {}
+    }
+  }
+}
