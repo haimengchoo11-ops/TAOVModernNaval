@@ -18,7 +18,11 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import rbasamoyai.createbigcannons.munitions.AbstractCannonProjectile;
+import rbasamoyai.createbigcannons.munitions.ProjectileContext;
 import rbasamoyai.createbigcannons.munitions.big_cannon.he_shell.HEShellProjectile;
 import software.bernie.geckolib.animatable.GeoEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
@@ -54,27 +58,93 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
     private static final String TAG_SWITCH_ADVANTAGE_DISTANCE = "SwitchAdvantageDistance";
     private static final String TAG_FORCE_SWITCH_DISTANCE = "ForceSwitchDistance";
     private static final String TAG_RENDER_ITEM = "RenderItem";
-    private static final int TARGET_MEMORY_TICKS = 20;
-    private static final float MIN_CRUISE_SPEED_RATIO = 2.0F;
-    private static final float ACCELERATION_PER_TICK = 0.055F;
+    private static final String TAG_FUZE_INSTALLED = "FuzeInstalled";
+    private static final String TAG_LOCK_STRENGTH = "LockStrength";
+    private static final String TAG_TARGET_LOCK_TICKS = "TargetLockTicks";
+    private static final int TARGET_MEMORY_TICKS = 100;
+    private static final float MIN_CRUISE_SPEED_RATIO = 1.8F;
+    private static final float ACCELERATION_PER_TICK = 0.11F;
     private static final double TARGET_SWITCH_DISTANCE = 14.0D;
     private static final double TRACK_SMOOTH_BLEND = 0.28D;
+    private static final int SAFETY_DELAY_TICKS = 30;
     private static final double TRACK_SWITCH_BLEND = 0.55D;
     private static final int DEFAULT_LOCK_HOLD_TICKS = 16;
     private static final double DEFAULT_SWITCH_ADVANTAGE_DISTANCE = 8.0D;
     private static final double DEFAULT_FORCE_SWITCH_DISTANCE = 22.0D;
-    private static final float PHYSICS_TARGET_RANGE_BONUS = 500.0F;
+    private static final float PHYSICS_TARGET_RANGE_BONUS = 400.0F;
+    private static final double PREDICTIVE_LEAD_DISTANCE = 0.35D;
+    private static final int MAX_MISSILE_LIFETIME = 600;  // 导弹最大寿命：600 tick = 30秒
+    private static final int GUIDANCE_RAMP_TICKS = 20;    // 制导斜坡：前20 ticks逐步建立制导能力
+    private static final float LOCK_STRENGTH_GAIN = 0.02f; // 每 tick增加2%锁定强度（50 ticks满锁定）
+    private static final float LOCK_STRENGTH_DECAY = 0.01f; // 每 tick衰减1%锁定强度
 
     private final AnimatableInstanceCache geckoCache = GeckoLibUtil.createInstanceCache(this);
     private ItemStack renderItem = new ItemStack(ModItems.P1_MISSILE.get());
     private UUID assignedTarget;
     private Vec3 designatedTargetPos;
     private Vec3 inertialTarget;
+    private Vec3 lastTargetVelocity = Vec3.ZERO;
     private int targetMemoryTicks;
     private int lockHoldTicks;
     private int lockHoldTicksConfig = DEFAULT_LOCK_HOLD_TICKS;
     private double switchAdvantageDistance = DEFAULT_SWITCH_ADVANTAGE_DISTANCE;
     private double forceSwitchDistance = DEFAULT_FORCE_SWITCH_DISTANCE;
+    private boolean fuzeInstalled = false;
+    private float lockStrength = 0.0f;  // 锁定强度：0-1，影响制导能力
+    private int targetLockTicks = 0;    // 目标被锁定的持续时间（用于诊断）
+
+    protected Vec3 directorProvidedTarget = null;
+    protected float directorLockStrength = 0.0f;
+    protected net.minecraft.core.BlockPos directorPos = null;
+    protected int directorUpdateTicks = 0;
+
+    public void setFuzeInstalled(boolean installed) {
+        this.fuzeInstalled = installed;
+    }
+
+    public boolean isFuzeInstalled() {
+        return fuzeInstalled;
+    }
+
+    /**
+     * 获取制导斜坡（0-1）
+     * 前GUIDANCE_RAMP_TICKS内从0逐步增加到1，防止初期过度转向
+     */
+    private double getGuidanceRamp() {
+        if (tickCount < SAFETY_DELAY_TICKS) {
+            return 0.0;
+        }
+        double rampProgress = (tickCount - SAFETY_DELAY_TICKS) / (double) GUIDANCE_RAMP_TICKS;
+        return Math.min(1.0, rampProgress);
+    }
+
+    /**
+     * 更新锁定强度
+     * 目标在范围内时增加，超出范围时衰减
+     */
+    private void updateLockStrength(Vec3 targetPos) {
+        if (targetPos != null) {
+            double distance = position().distanceTo(targetPos);
+            if (distance < seekRange() * 1.5) {  // 有效搜索范围内
+                lockStrength = Math.min(1.0f, lockStrength + LOCK_STRENGTH_GAIN);
+                targetLockTicks++;
+            } else {
+                lockStrength = Math.max(0.0f, lockStrength - LOCK_STRENGTH_DECAY);
+                targetLockTicks = Math.max(0, targetLockTicks - 1);
+            }
+        } else {
+            lockStrength = Math.max(0.0f, lockStrength - LOCK_STRENGTH_DECAY);
+            targetLockTicks = Math.max(0, targetLockTicks - 1);
+        }
+    }
+
+    public float getLockStrength() {
+        return lockStrength;
+    }
+
+    public int getTargetLockTicks() {
+        return targetLockTicks;
+    }
 
     public P1MissileEntity(EntityType<? extends P1MissileEntity> entityType, Level level) {
         super(entityType, level);
@@ -98,7 +168,7 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
     protected void defineSynchedData() {
         super.m_8097_();
         MissileProfile defaults = MissileProfile.p1Default();
-        entityData.define(DATA_FUSE, 200);
+        entityData.define(DATA_FUSE, 600);  // 600 tick = 30秒（半分钟）
         entityData.define(DATA_LAUNCH_X, 0.0F);
         entityData.define(DATA_LAUNCH_Y, 0.0F);
         entityData.define(DATA_LAUNCH_Z, 0.0F);
@@ -113,7 +183,6 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
     public void setFuzeTicks(int ticks) {
         int clamped = Math.max(1, ticks);
         entityData.set(DATA_FUSE, clamped);
-        setExplosionCountdown(clamped);
     }
 
     public void setLauncherOrigin(Vec3 origin) {
@@ -194,8 +263,54 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
         return entityData.get(DATA_IFF_SAFE_RADIUS);
     }
 
+    // 重写爆炸：使用 vanilla TNT 爆炸模式，确保破坏方块
+    @Override
+    protected void detonate(net.minecraft.core.Position pos) {
+        if (!level().isClientSide) {
+            level().explode(this, pos.x(), pos.y(), pos.z(), blastPower(),
+                    net.minecraft.world.level.Level.ExplosionInteraction.TNT);
+        }
+        discard();
+    }
+
+    // 重写碰撞引爆：绕过父类 canDetonate() 检查，需引信已安装，且发射 30 tick 后才生效
+    @Override
+    protected boolean onImpact(HitResult hitResult,
+            AbstractCannonProjectile.ImpactResult impactResult,
+            ProjectileContext ctx) {
+        if (!level().isClientSide && isAlive() && fuzeInstalled && tickCount > SAFETY_DELAY_TICKS) {
+            detonate(hitResult.getLocation());
+        }
+        return true;
+    }
+
+    @Override
+    protected boolean onClip(ProjectileContext ctx, Vec3 from, Vec3 to) {
+        if (!level().isClientSide && isAlive() && fuzeInstalled && tickCount > SAFETY_DELAY_TICKS) {
+            detonate(from.add(to).scale(0.5D));
+        }
+        return true;
+    }
+
     @Override
     public void tick() {
+        // 安全延迟期间（前30个tick）：仅执行基础运动和方向，不运行父类碰撞检测
+        if (tickCount <= SAFETY_DELAY_TICKS) {
+            tickCount++;
+            setNoGravity(true);
+            // 直接设置位置，绕过move()的碰撞检测
+            Vec3 motion = getDeltaMovement();
+            Vec3 newPos = position().add(motion);
+            setPos(newPos.x, newPos.y, newPos.z);
+            alignToFlightDirection();
+            if (level().isClientSide) {
+                spawnTrailParticles();
+            }
+            return;
+        }
+
+        // 安全期后：恢复父类 tick 以保留追踪/物理更新，但清掉 CBC 自带倒计时
+        setExplosionCountdown(-1);
         super.tick();
         if (!isAlive()) {
             return;
@@ -208,23 +323,19 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
             return;
         }
 
-        entityData.set(DATA_FUSE, Math.max(0, getExplosionCountdown()));
-        if (getExplosionCountdown() <= 0) {
-            detonate();
-            return;
-        }
+        // 注意：碰撞引信由 onImpact/onClip 处理，不需要在这里重复检测
 
         Vec3 targetPos = resolveAssignedTargetPos();
         float physicsSeekRange = seekRange() + PHYSICS_TARGET_RANGE_BONUS;
         Optional<Vec3> physicsTarget = PhysicsTargeting.findNearestPhysicsTarget(level(), position(), physicsSeekRange, maxSpeed(), getLauncherOrigin(), iffSafeRadius());
 
-        if (targetPos == null) {
-            if (physicsTarget.isPresent()) {
-                updateDynamicDesignatedTarget(position(), physicsTarget.get());
-                targetPos = designatedTargetPos;
-            } else if (designatedTargetPos != null) {
-                targetPos = designatedTargetPos;
-            }
+        // 持续追踪逻辑：每 tick 都尝试寻找目标
+        if (physicsTarget.isPresent()) {
+            updateDynamicDesignatedTarget(position(), physicsTarget.get());
+            targetPos = designatedTargetPos;
+        } else if (targetPos == null && designatedTargetPos != null) {
+            // 使用上一个指定目标
+            targetPos = designatedTargetPos;
         }
 
         if (targetPos != null) {
@@ -234,39 +345,60 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
             targetMemoryTicks--;
             targetPos = inertialTarget;
         } else {
+            // 目标丧失后，清空记忆但继续下一 tick 寻找
             inertialTarget = null;
             targetMemoryTicks = 0;
+            // 不立即清空 targetPos，让下一个 tick 继续尝试寻找
+            if (designatedTargetPos != null) {
+                targetPos = designatedTargetPos;
+            }
         }
 
         if (targetPos != null) {
-            // 有目标时：渐进加速 + 末段增强转向
+            // 有目标时：渐进加速 + 动态转向 + 速度预测
             double distance = position().distanceTo(targetPos);
-            float steeringGain = steering();
-            if (distance < 18.0D) {
-                steeringGain = Math.min(1.0F, steeringGain * 1.6F);
-            } else if (distance < 36.0D) {
-                steeringGain = Math.min(1.0F, steeringGain * 1.3F);
-            }
-
             Vec3 current = getDeltaMovement();
             double currentSpeed = current.length();
             double desiredSpeed = computeNextSpeed(currentSpeed);
+            
+            // 更新锁定强度
+            updateLockStrength(targetPos);
+            
+            // 获取制导斜坡和锁定强度的综合效果
+            double guidanceRamp = getGuidanceRamp();
+            float effectiveSteeringGain = steering() * (float)guidanceRamp * lockStrength;
+            
+            // 动态转向增益：基于距离和速度差
+            double speedRatio = currentSpeed > 0 ? desiredSpeed / currentSpeed : 1.0D;
+            
+            // 距离越近，转向越敏捷；速度差越大，转向越强
+            if (distance < 15.0D) {
+                effectiveSteeringGain = Math.min(1.0F, effectiveSteeringGain * (2.0F + (float)(speedRatio - 1.0D)));
+            } else if (distance < 30.0D) {
+                effectiveSteeringGain = Math.min(1.0F, effectiveSteeringGain * (1.6F + (float)(speedRatio - 1.0D) * 0.5F));
+            } else if (distance < 60.0D) {
+                effectiveSteeringGain = Math.min(1.0F, effectiveSteeringGain * (1.3F + (float)(speedRatio - 1.0D) * 0.3F));
+            } else if (distance < 120.0D) {
+                effectiveSteeringGain = Math.min(1.0F, effectiveSteeringGain * 1.1F);
+            }
 
-            Vec3 toTarget = targetPos.subtract(position());
+            // 预测拦截点：考虑目标速度
+            Vec3 targetVelocity = lastTargetVelocity;
+            Vec3 predictedPos = targetPos.add(targetVelocity.scale(PREDICTIVE_LEAD_DISTANCE));
+            Vec3 toTarget = predictedPos.subtract(position());
+            
             if (toTarget.lengthSqr() > 1.0E-6D) {
                 Vec3 desired = toTarget.normalize().scale(desiredSpeed);
-                Vec3 blended = current.scale(1.0D - steeringGain).add(desired.scale(steeringGain));
+                Vec3 blended = current.scale(1.0D - effectiveSteeringGain).add(desired.scale(effectiveSteeringGain));
                 if (blended.lengthSqr() > 1.0E-6D) {
                     blended = blended.normalize().scale(desiredSpeed);
                     setDeltaMovement(blended);
                 }
             }
 
-            if (distance < proximityFuse()) {
-                detonate();
-                return;
-            }
         } else {
+            // 目标丧失时衰减锁定强度
+            updateLockStrength(null);
             // 无目标时保持飞行，直到寿命（引信倒计时）结束再自爆
             Vec3 currentMotion = getDeltaMovement();
             if (currentMotion.lengthSqr() < 0.01D) {
@@ -275,6 +407,13 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
                 double nextSpeed = computeNextSpeed(currentMotion.length());
                 setDeltaMovement(currentMotion.normalize().scale(nextSpeed));
             }
+        }
+
+        // 分离机制：
+        // - 有引信导弹：碰撞爆炸（通过引信控制）
+        // - 无引信导弹：经过最大寿命（600 tick = 30秒）后自动爆炸，不受getFuzeTicks()影响
+        if (!fuzeInstalled && tickCount > SAFETY_DELAY_TICKS && tickCount >= MAX_MISSILE_LIFETIME) {
+            detonate();
         }
     }
 
@@ -314,7 +453,10 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
         }
 
         double blend = separation <= TARGET_SWITCH_DISTANCE ? TRACK_SMOOTH_BLEND : TRACK_SWITCH_BLEND;
+        Vec3 lastPos = designatedTargetPos;
         designatedTargetPos = designatedTargetPos.lerp(candidate, blend);
+        // 更新目标速度用于预测
+        lastTargetVelocity = designatedTargetPos.subtract(lastPos);
         lockHoldTicks = Math.max(0, lockHoldTicks - 1);
     }
 
@@ -352,18 +494,59 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
     }
 
     private Vec3 resolveAssignedTargetPos() {
-        if (assignedTarget == null || !(level() instanceof ServerLevel serverLevel)) {
+        if (!(level() instanceof ServerLevel serverLevel)) {
             return null;
         }
 
-        var entity = serverLevel.getEntity(assignedTarget);
-        if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
+        if (assignedTarget != null) {
+            var entity = serverLevel.getEntity(assignedTarget);
+            if (entity instanceof LivingEntity living && living.isAlive()) {
+                Vec3 targetPoint = living.position().add(0.0D, living.getBbHeight() * 0.5D, 0.0D);
+                return PhysicsTargeting.predictInterceptPoint(position(), targetPoint, living.getDeltaMovement(), maxSpeed());
+            }
             assignedTarget = null;
+        }
+
+        if (hasDirectorGuidance()) {
+            return directorProvidedTarget;
+        }
+
+        if (designatedTargetPos != null) {
+            return designatedTargetPos;
+        }
+
+        LivingEntity nearest = findNearestValidTarget(serverLevel, seekRange() + 32.0D);
+        if (nearest == null) {
             return null;
         }
 
-        Vec3 targetPoint = living.position().add(0.0D, living.getBbHeight() * 0.5D, 0.0D);
-        return PhysicsTargeting.predictInterceptPoint(position(), targetPoint, living.getDeltaMovement(), maxSpeed());
+        Vec3 targetPoint = nearest.position().add(0.0D, nearest.getBbHeight() * 0.5D, 0.0D);
+        return PhysicsTargeting.predictInterceptPoint(position(), targetPoint, nearest.getDeltaMovement(), maxSpeed());
+    }
+
+    private boolean hasDirectorGuidance() {
+        return directorProvidedTarget != null && directorLockStrength > 0.0f && (tickCount - directorUpdateTicks) <= 200;
+    }
+
+    private LivingEntity findNearestValidTarget(ServerLevel level, double radius) {
+        AABB searchBox = new AABB(position().subtract(radius, radius, radius), position().add(radius, radius, radius));
+        LivingEntity best = null;
+        double bestDistance = Double.MAX_VALUE;
+
+        for (LivingEntity candidate : level.getEntitiesOfClass(LivingEntity.class, searchBox, entity ->
+                entity != null
+                        && entity.isAlive()
+                        && entity.getId() != this.getId()
+                        && !entity.isSpectator()
+                        && entity.distanceToSqr(this) <= radius * radius)) {
+            double distance = candidate.distanceToSqr(this);
+            if (distance < bestDistance) {
+                best = candidate;
+                bestDistance = distance;
+            }
+        }
+
+        return best;
     }
 
     @Override
@@ -392,6 +575,9 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
         tag.putInt(TAG_LOCK_HOLD_TICKS, lockHoldTicksConfig);
         tag.putDouble(TAG_SWITCH_ADVANTAGE_DISTANCE, switchAdvantageDistance);
         tag.putDouble(TAG_FORCE_SWITCH_DISTANCE, forceSwitchDistance);
+        tag.putBoolean(TAG_FUZE_INSTALLED, fuzeInstalled);
+        tag.putFloat(TAG_LOCK_STRENGTH, lockStrength);
+        tag.putInt(TAG_TARGET_LOCK_TICKS, targetLockTicks);
     }
 
     @Override
@@ -423,6 +609,15 @@ public class P1MissileEntity extends HEShellProjectile implements GeoEntity {
             tag.contains(TAG_SWITCH_ADVANTAGE_DISTANCE) ? tag.getDouble(TAG_SWITCH_ADVANTAGE_DISTANCE) : DEFAULT_SWITCH_ADVANTAGE_DISTANCE,
             tag.contains(TAG_FORCE_SWITCH_DISTANCE) ? tag.getDouble(TAG_FORCE_SWITCH_DISTANCE) : DEFAULT_FORCE_SWITCH_DISTANCE
         );
+        if (tag.contains(TAG_FUZE_INSTALLED)) {
+            fuzeInstalled = tag.getBoolean(TAG_FUZE_INSTALLED);
+        }
+        if (tag.contains(TAG_LOCK_STRENGTH)) {
+            lockStrength = tag.getFloat(TAG_LOCK_STRENGTH);
+        }
+        if (tag.contains(TAG_TARGET_LOCK_TICKS)) {
+            targetLockTicks = tag.getInt(TAG_TARGET_LOCK_TICKS);
+        }
         inertialTarget = null;
         targetMemoryTicks = 0;
         lockHoldTicks = 0;
