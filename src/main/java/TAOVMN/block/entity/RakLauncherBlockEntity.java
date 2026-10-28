@@ -1,68 +1,114 @@
 package TAOVMN.block.entity;
 
-import TAOVMN.compat.cbc.CbcCompat;
-import TAOVMN.item.LauncherBlockItem;
-import TAOVMN.registry.ModBlockEntities;
-import TAOVMN.item.MissileItem;
-import TAOVMN.registry.ModItems;
-import TAOVMN.util.MissileProfile;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
-import net.minecraft.world.ContainerHelper;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.WorldlyContainer;
-import net.minecraftforge.common.capabilities.Capability;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.common.util.LazyOptional;
-import net.minecraftforge.items.IItemHandler;
-import net.minecraftforge.items.wrapper.SidedInvWrapper;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import org.jetbrains.annotations.NotNull;
+
+import TAOVMN.entity.ShaoMissileProjectile;
+import TAOVMN.item.LauncherBlockItem;
+import TAOVMN.registry.ModBlockEntities;
+import TAOVMN.registry.ModItems;
+import TAOVMN.util.MissileFireControl;
+import TAOVMN.util.MissileProfile;
+import TAOVMN.util.OwnerTracked;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtUtils;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import software.bernie.geckolib.animatable.GeoBlockEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
-public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContainer, GeoBlockEntity {
-    private static final String TAG_MISSILES = "Missiles";
-    private static final String TAG_FUZE_TICKS = "FuzeTicks";
-    private static final String TAG_PROFILE_MAX_SPEED = "ProfileMaxSpeed";
-    private static final String TAG_PROFILE_STEERING = "ProfileSteering";
-    private static final String TAG_PROFILE_BLAST_POWER = "ProfileBlastPower";
-    private static final String TAG_PROFILE_SEEK_RANGE = "ProfileSeekRange";
-    private static final String TAG_PROFILE_PROXIMITY_FUSE = "ProfileProximityFuse";
-    private static final String TAG_PROFILE_IFF_SAFE_RADIUS = "ProfileIffSafeRadius";
-    private static final String TAG_BOUND_RADAR_POS = "BoundRadarPos";
-    private static final String TAG_ARM_STORAGE_TARGET = "ArmStorageTarget";
-    private static final int[] FUZE_PRESETS = new int[]{120, 200, 320, 480};
-    private static final int[] SLOTS = new int[]{0, 1};
-    private static final int RADAR_BIND_RANGE = 48;
+/**
+ * RAK 导弹发射架方块实体。
+ *
+ * <p>火控基础功能：装填导弹（最多 2 发）→ 绑定雷达 / 火控指挥仪 → 读取其锁定目标 →
+ * 收到<b>红石上升沿</b>时发射一发，并按目标指派制导。右键只负责装填 / 卸载 / 绑定 / 查询。
+ */
+public class RakLauncherBlockEntity extends BlockEntity implements GeoBlockEntity, OwnerTracked {
     public static final int MAX_MISSILES = 2;
 
-    private final List<ItemStack> missiles = new ArrayList<>();
-    private final LazyOptional<? extends IItemHandler>[] sidedHandlers = SidedInvWrapper.create(this, Direction.UP, Direction.DOWN, Direction.NORTH);
-    private final LazyOptional<IItemHandler> genericHandler = LazyOptional.of(() -> new SidedInvWrapper(this, null));
-    private final AnimatableInstanceCache geckoCache = GeckoLibUtil.createInstanceCache(this);
-    private int fuzeTicks = 200;
-    private MissileProfile missileProfile = MissileProfile.p1Default();
-    private BlockPos boundRadarPos;
-    private boolean armStorageTarget;
+    private static final int[] FUZE_PRESETS = {120, 200, 320, 480};
+    private static final int NEAREST_RADAR_RANGE = 16;
+    private static final int FIRE_COOLDOWN_TICKS = 10;
+    private static final String TAG_MISSILES = "Missiles";
+    private static final String TAG_FUZE_TICKS = "FuzeTicks";
+    private static final String TAG_BOUND_RADAR = "BoundRadarPos";
 
-    public RakLauncherBlockEntity(BlockPos pos, BlockState blockState) {
-        super(ModBlockEntities.RAK_LAUNCHER.get(), pos, blockState);
+    private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+    private final List<ItemStack> missiles = new ArrayList<>();
+    private int fuzeTicks = 200;
+    private BlockPos boundRadarPos;
+    private boolean powered;
+    private int fireCooldown;
+    /** 放置这座发射架的玩家；null 表示归属未知（不施加 IFF 保护）。 */
+    @Nullable
+    private UUID ownerId;
+
+    public RakLauncherBlockEntity(BlockPos pos, BlockState state) {
+        this(ModBlockEntities.RAK_LAUNCHER.get(), pos, state);
     }
+
+    public RakLauncherBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
+        super(type, pos, state);
+    }
+
+    // ---- 红石触发发射 ----
+
+    public static void tick(Level level, BlockPos pos, BlockState state, RakLauncherBlockEntity launcher) {
+        if (!(level instanceof ServerLevel serverLevel)) {
+            return;
+        }
+        if (launcher.fireCooldown > 0) {
+            launcher.fireCooldown--;
+        }
+        boolean poweredNow = level.hasNeighborSignal(pos);
+        if (poweredNow && !launcher.powered && launcher.fireCooldown <= 0) {
+            launcher.fireNextMissile(serverLevel, pos);
+            launcher.fireCooldown = FIRE_COOLDOWN_TICKS;
+        }
+        launcher.powered = poweredNow;
+    }
+
+    /** 红石上升沿：发射一发已装填导弹（无弹则忽略）。 */
+    public boolean fireNextMissile(ServerLevel level, BlockPos pos) {
+        if (missiles.isEmpty()) {
+            return false;
+        }
+
+        ItemStack stack = missiles.remove(0);
+        setChanged();
+
+        UUID targetUuid = getSelectedRadarTargetUuid();
+        Vec3 targetPos = getSelectedRadarTargetPos();
+        Vec3 muzzle = Vec3.atCenterOf(pos).add(0.0D, 0.7D, 0.0D);
+
+        // 垂直冷发射：出膛后由制导转向火控目标
+        ShaoMissileProjectile missile = MissileFireControl.launch(level, stack, muzzle,
+                new Vec3(0.0D, 1.0D, 0.0D), fuzeTicks, targetUuid, targetPos, muzzle, ownerId);
+        if (missile == null) {
+            return false;
+        }
+
+        level.playSound(null, pos, SoundEvents.FIRECHARGE_USE, SoundSource.BLOCKS, 1.2F, 0.9F);
+        level.sendBlockUpdated(pos, getBlockState(), getBlockState(), 3);
+        return true;
+    }
+
+    // ---- 装填 / 卸载 ----
 
     public boolean hasMissile() {
         return !missiles.isEmpty();
@@ -80,16 +126,13 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
         if (stack.isEmpty() || isFull() || !ModItems.isMissile(stack)) {
             return false;
         }
-
         ItemStack loaded = stack.copyWithCount(1);
-        if (loaded.getItem() instanceof MissileItem missileItem) {
+        if (loaded.getItem() instanceof TAOVMN.item.MissileItem missileItem) {
             MissileProfile.ensureProfileTag(loaded, missileItem.getDefaultProfile());
-        } else if (CbcCompat.isSupportedAmmo(loaded)) {
-            CbcCompat.primeTaovProfileTag(loaded);
         }
         missiles.add(loaded);
-        missileProfile = MissileProfile.resolve(loaded);
         setChanged();
+        syncToClients();
         return true;
     }
 
@@ -97,60 +140,27 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
         if (missiles.isEmpty()) {
             return ItemStack.EMPTY;
         }
-
         ItemStack extracted = missiles.remove(missiles.size() - 1);
-        missileProfile = missiles.isEmpty() ? MissileProfile.p1Default() : MissileProfile.resolve(missiles.get(missiles.size() - 1));
         setChanged();
+        syncToClients();
         return extracted;
     }
 
-    private int lastFilledSlot() {
-        for (int i = MAX_MISSILES - 1; i >= 0; i--) {
-            if (i < missiles.size() && !missiles.get(i).isEmpty()) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
-    public ItemStack removeAllMissiles() {
-        if (missiles.isEmpty()) {
-            return ItemStack.EMPTY;
-        }
-
-        ItemStack first = missiles.get(0).copy();
-        boolean allSame = missiles.stream().allMatch(s -> ItemStack.isSameItemSameTags(first, s));
-
-        ItemStack drop;
-        if (allSame) {
-            drop = first;
-            drop.setCount(missiles.size());
-        } else {
-            drop = first;
-        }
-
-        missiles.clear();
-        missileProfile = MissileProfile.p1Default();
-        setChanged();
-        return drop;
-    }
-
-    public int getFuzeTicks() {
-        return fuzeTicks;
+    /** 当前最上层（最后装填）的导弹，供总控台显示弹药名；无弹时返回空。 */
+    public ItemStack getTopMissile() {
+        return missiles.isEmpty() ? ItemStack.EMPTY : missiles.get(missiles.size() - 1);
     }
 
     public MissileProfile getMissileProfile() {
-        if (missiles.isEmpty()) {
-            return MissileProfile.p1Default();
-        }
-        return MissileProfile.resolve(missiles.get(missiles.size() - 1));
+        return missiles.isEmpty()
+                ? MissileProfile.p1Default()
+                : MissileProfile.resolve(missiles.get(missiles.size() - 1));
     }
 
-    public boolean hasCurrentMissileProfileTag() {
-        if (missiles.isEmpty()) {
-            return false;
-        }
-        return MissileProfile.hasProfileTag(missiles.get(missiles.size() - 1));
+    // ---- 引信预设 ----
+
+    public int getFuzeTicks() {
+        return fuzeTicks;
     }
 
     public int cycleFuzePreset() {
@@ -161,18 +171,15 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
                 return fuzeTicks;
             }
         }
-
         fuzeTicks = FUZE_PRESETS[0];
         setChanged();
         return fuzeTicks;
     }
 
+    // ---- 雷达绑定 ----
+
     public boolean hasBoundRadar() {
         return getBoundRadarEntity() != null;
-    }
-
-    public boolean ensureRadarBound() {
-        return hasBoundRadar() || bindNearestRadar();
     }
 
     public BlockPos getBoundRadarPos() {
@@ -182,99 +189,54 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
     public void setBoundRadarPos(BlockPos radarPos) {
         this.boundRadarPos = radarPos == null ? null : radarPos.immutable();
         setChanged();
+        syncToClients();
     }
 
-    public boolean isArmStorageTarget() {
-        return armStorageTarget;
-    }
-
-    public boolean setArmStorageTarget(boolean value) {
-        if (armStorageTarget == value) {
-            return false;
-        }
-        armStorageTarget = value;
-        setChanged();
-        return true;
-    }
-
+    /** 消费发射架物品上预绑定的雷达坐标（放置时调用）。 */
     public void applyPlacementTag(CompoundTag itemTag) {
-        if (itemTag == null) {
+        if (itemTag == null || !itemTag.contains(LauncherBlockItem.TAG_PREBOUND_RADAR_POS)) {
             return;
         }
-
-        if (itemTag.contains(LauncherBlockItem.TAG_PREBOUND_RADAR_POS, 10)) {
-            setBoundRadarPos(NbtUtils.readBlockPos(itemTag.getCompound(LauncherBlockItem.TAG_PREBOUND_RADAR_POS)));
-        }
+        setBoundRadarPos(NbtUtils.readBlockPos(itemTag.getCompound(LauncherBlockItem.TAG_PREBOUND_RADAR_POS)));
     }
 
+    /** 就近绑定雷达 / 火控指挥仪（{@value #NEAREST_RADAR_RANGE} 格内）。 */
     public boolean bindNearestRadar() {
-        if (level == null) {
+        if (!(level instanceof ServerLevel serverLevel)) {
             return false;
         }
-
-        BlockPos nearestPos = null;
-        double nearestSqr = RADAR_BIND_RANGE * RADAR_BIND_RANGE;
-
-        for (int dx = -RADAR_BIND_RANGE; dx <= RADAR_BIND_RANGE; dx++) {
-            for (int dy = -RADAR_BIND_RANGE; dy <= RADAR_BIND_RANGE; dy++) {
-                for (int dz = -RADAR_BIND_RANGE; dz <= RADAR_BIND_RANGE; dz++) {
-                    BlockPos testPos = worldPosition.offset(dx, dy, dz);
-                    if (!(level.getBlockEntity(testPos) instanceof RadarBlockEntity)) {
-                        continue;
-                    }
-
-                    double distanceSqr = testPos.distSqr(worldPosition);
-                    if (distanceSqr < nearestSqr) {
-                        nearestSqr = distanceSqr;
-                        nearestPos = testPos.immutable();
-                    }
-                }
-            }
-        }
-
-        if (nearestPos == null) {
+        RadarBlockEntity radar = MissileFireControl.findNearbyRadar(serverLevel, worldPosition, NEAREST_RADAR_RANGE);
+        if (radar == null) {
             return false;
         }
-
-        boundRadarPos = nearestPos;
-        setChanged();
+        setBoundRadarPos(radar.getBlockPos());
         return true;
     }
 
-    public UUID cycleRadarTarget() {
-        RadarBlockEntity radar = getBoundRadarEntity();
-        if (radar == null) {
+    private RadarBlockEntity getBoundRadarEntity() {
+        if (level == null || boundRadarPos == null) {
             return null;
         }
-        return radar.cycleTargetSelection();
-    }
-
-    public void refreshRadarTargets() {
-        RadarBlockEntity radar = getBoundRadarEntity();
-        if (radar != null) {
-            radar.refreshTargetsNow();
+        if (level.getBlockEntity(boundRadarPos) instanceof RadarBlockEntity radar) {
+            return radar;
         }
+        boundRadarPos = null;
+        setChanged();
+        return null;
     }
 
+    // ---- 火控目标读取（委托给绑定雷达） ----
+
+    @Nullable
     public UUID getSelectedRadarTargetUuid() {
         RadarBlockEntity radar = getBoundRadarEntity();
-        if (radar == null) {
-            return null;
-        }
-        return radar.getSelectedTargetUuid();
+        return radar == null ? null : radar.getSelectedTargetUuid();
     }
 
+    @Nullable
     public Vec3 getSelectedRadarTargetPos() {
         RadarBlockEntity radar = getBoundRadarEntity();
-        if (radar == null) {
-            return null;
-        }
-        return radar.getSelectedTargetPos();
-    }
-
-    public boolean isSelectedRadarPhysicsTarget() {
-        RadarBlockEntity radar = getBoundRadarEntity();
-        return radar != null && radar.isSelectedPhysicsTarget();
+        return radar == null ? null : radar.getSelectedTargetPos();
     }
 
     public int getRadarTrackedCount() {
@@ -284,10 +246,7 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
 
     public boolean toggleRadarIff() {
         RadarBlockEntity radar = getBoundRadarEntity();
-        if (radar == null) {
-            return false;
-        }
-        return radar.toggleIff();
+        return radar != null && radar.toggleIff();
     }
 
     public boolean isRadarIffEnabled() {
@@ -295,185 +254,27 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
         return radar != null && radar.isIffEnabled();
     }
 
-    private RadarBlockEntity getBoundRadarEntity() {
-        if (level == null || boundRadarPos == null) {
-            return null;
-        }
+    // ---- 归属（IFF） ----
 
-        if (level.getBlockEntity(boundRadarPos) instanceof RadarBlockEntity radar) {
-            return radar;
-        }
-
-        boundRadarPos = null;
-        setChanged();
-        return null;
+    @Override
+    @Nullable
+    public UUID getOwnerId() {
+        return ownerId;
     }
 
     @Override
-    public int getContainerSize() {
-        return MAX_MISSILES;
-    }
-
-    @Override
-    public boolean isEmpty() {
-        return missiles.isEmpty();
-    }
-
-    @Override
-    public ItemStack getItem(int slot) {
-        if (slot < 0 || slot >= MAX_MISSILES || slot >= missiles.size()) {
-            return ItemStack.EMPTY;
-        }
-        return missiles.get(slot);
-    }
-
-    @Override
-    public ItemStack removeItem(int slot, int amount) {
-        if (slot < 0 || slot >= MAX_MISSILES || slot >= missiles.size() || amount <= 0) {
-            return ItemStack.EMPTY;
-        }
-        ItemStack current = missiles.get(slot);
-        ItemStack extracted = current.split(Math.min(amount, current.getCount()));
-        if (current.isEmpty()) {
-            missiles.remove(slot);
-        }
-        refreshProfileAndMarkChanged();
-        return extracted;
-    }
-
-    @Override
-    public ItemStack removeItemNoUpdate(int slot) {
-        if (slot < 0 || slot >= MAX_MISSILES || slot >= missiles.size()) {
-            return ItemStack.EMPTY;
-        }
-        ItemStack extracted = missiles.remove(slot);
-        refreshProfileAndMarkChanged();
-        return extracted;
-    }
-
-    @Override
-    public void setItem(int slot, ItemStack stack) {
-        if (slot < 0 || slot >= MAX_MISSILES) {
-            return;
-        }
-
-        if (stack.isEmpty()) {
-            if (slot < missiles.size()) {
-                missiles.remove(slot);
-                refreshProfileAndMarkChanged();
-            }
-            return;
-        }
-
-        if (!ModItems.isMissile(stack)) {
-            return;
-        }
-
-        ItemStack single = stack.copyWithCount(1);
-        if (single.getItem() instanceof MissileItem missileItem) {
-            MissileProfile.ensureProfileTag(single, missileItem.getDefaultProfile());
-        } else if (CbcCompat.isSupportedAmmo(single)) {
-            CbcCompat.primeTaovProfileTag(single);
-        }
-
-        while (missiles.size() <= slot) {
-            missiles.add(ItemStack.EMPTY);
-        }
-        missiles.set(slot, single);
-
-        for (int i = missiles.size() - 1; i >= 0; i--) {
-            if (!missiles.get(i).isEmpty()) {
-                break;
-            }
-            missiles.remove(i);
-        }
-
-        refreshProfileAndMarkChanged();
-    }
-
-    @Override
-    public boolean stillValid(Player player) {
-        if (level == null) {
-            return false;
-        }
-        if (level.getBlockEntity(worldPosition) != this) {
-            return false;
-        }
-        return player.distanceToSqr(worldPosition.getX() + 0.5D, worldPosition.getY() + 0.5D, worldPosition.getZ() + 0.5D) <= 64.0D;
-    }
-
-    @Override
-    public void clearContent() {
-        missiles.clear();
-        refreshProfileAndMarkChanged();
-    }
-
-    @Override
-    public boolean canPlaceItem(int slot, ItemStack stack) {
-        return slot >= 0 && slot < MAX_MISSILES && ModItems.isMissile(stack);
-    }
-
-    @Override
-    public int[] getSlotsForFace(Direction side) {
-        return SLOTS;
-    }
-
-    @Override
-    public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction side) {
-        return armStorageTarget && canPlaceItem(slot, stack);
-    }
-
-    @Override
-    public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction side) {
-        return true;
-    }
-
-    @Override
-    public int getMaxStackSize() {
-        return 1;
-    }
-
-    @Override
-    public <T> @NotNull LazyOptional<T> getCapability(@NotNull Capability<T> capability, @Nullable Direction side) {
-        if (!this.remove && capability == ForgeCapabilities.ITEM_HANDLER) {
-            if (side == null) {
-                return genericHandler.cast();
-            }
-            if (side == Direction.UP) {
-                return sidedHandlers[0].cast();
-            }
-            if (side == Direction.DOWN) {
-                return sidedHandlers[1].cast();
-            }
-            return sidedHandlers[2].cast();
-        }
-        return super.getCapability(capability, side);
-    }
-
-    @Override
-    public void invalidateCaps() {
-        super.invalidateCaps();
-        for (LazyOptional<? extends IItemHandler> handler : sidedHandlers) {
-            handler.invalidate();
-        }
-        genericHandler.invalidate();
-    }
-
-    private void refreshProfileAndMarkChanged() {
-        int index = lastFilledSlot();
-        missileProfile = index >= 0 ? MissileProfile.resolve(missiles.get(index)) : MissileProfile.p1Default();
+    public void setOwnerId(@Nullable UUID ownerId) {
+        this.ownerId = ownerId;
         setChanged();
     }
 
-    @Override
-    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
-        // Reserved for future launcher animation controllers.
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        }
     }
 
-    @Override
-    public AnimatableInstanceCache getAnimatableInstanceCache() {
-        return geckoCache;
-    }
+    // ---- NBT / 网络同步 ----
 
     @Override
     protected void saveAdditional(CompoundTag tag) {
@@ -485,16 +286,10 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
         }
         tag.put(TAG_MISSILES, missilesTag);
         tag.putInt(TAG_FUZE_TICKS, fuzeTicks);
-        tag.putFloat(TAG_PROFILE_MAX_SPEED, missileProfile.maxSpeed());
-        tag.putFloat(TAG_PROFILE_STEERING, missileProfile.steering());
-        tag.putFloat(TAG_PROFILE_BLAST_POWER, missileProfile.blastPower());
-        tag.putFloat(TAG_PROFILE_SEEK_RANGE, missileProfile.seekRange());
-        tag.putFloat(TAG_PROFILE_PROXIMITY_FUSE, missileProfile.proximityFuse());
-        tag.putFloat(TAG_PROFILE_IFF_SAFE_RADIUS, missileProfile.iffSafeRadius());
         if (boundRadarPos != null) {
-            tag.putLong(TAG_BOUND_RADAR_POS, boundRadarPos.asLong());
+            tag.putLong(TAG_BOUND_RADAR, boundRadarPos.asLong());
         }
-        tag.putBoolean(TAG_ARM_STORAGE_TARGET, armStorageTarget);
+        OwnerTracked.write(tag, ownerId);
     }
 
     @Override
@@ -516,15 +311,31 @@ public class RakLauncherBlockEntity extends BlockEntity implements WorldlyContai
             }
         }
         fuzeTicks = tag.contains(TAG_FUZE_TICKS) ? tag.getInt(TAG_FUZE_TICKS) : 200;
-        boundRadarPos = tag.contains(TAG_BOUND_RADAR_POS) ? BlockPos.of(tag.getLong(TAG_BOUND_RADAR_POS)) : null;
-        armStorageTarget = tag.contains(TAG_ARM_STORAGE_TARGET) && tag.getBoolean(TAG_ARM_STORAGE_TARGET);
-        missileProfile = missiles.isEmpty() ? new MissileProfile(
-            tag.contains(TAG_PROFILE_MAX_SPEED) ? tag.getFloat(TAG_PROFILE_MAX_SPEED) : MissileProfile.p1Default().maxSpeed(),
-            tag.contains(TAG_PROFILE_STEERING) ? tag.getFloat(TAG_PROFILE_STEERING) : MissileProfile.p1Default().steering(),
-            tag.contains(TAG_PROFILE_BLAST_POWER) ? tag.getFloat(TAG_PROFILE_BLAST_POWER) : MissileProfile.p1Default().blastPower(),
-            tag.contains(TAG_PROFILE_SEEK_RANGE) ? tag.getFloat(TAG_PROFILE_SEEK_RANGE) : MissileProfile.p1Default().seekRange(),
-            tag.contains(TAG_PROFILE_PROXIMITY_FUSE) ? tag.getFloat(TAG_PROFILE_PROXIMITY_FUSE) : MissileProfile.p1Default().proximityFuse(),
-            tag.contains(TAG_PROFILE_IFF_SAFE_RADIUS) ? tag.getFloat(TAG_PROFILE_IFF_SAFE_RADIUS) : MissileProfile.p1Default().iffSafeRadius())
-                : MissileProfile.resolve(missiles.get(missiles.size() - 1));
+        boundRadarPos = tag.contains(TAG_BOUND_RADAR) ? BlockPos.of(tag.getLong(TAG_BOUND_RADAR)) : null;
+        ownerId = OwnerTracked.read(tag);
+    }
+
+    @Override
+    public CompoundTag getUpdateTag() {
+        CompoundTag tag = super.getUpdateTag();
+        saveAdditional(tag);
+        return tag;
+    }
+
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    // ---- GeckoLib ----
+
+    @Override
+    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+        // 预留：发射架动画控制器
+    }
+
+    @Override
+    public AnimatableInstanceCache getAnimatableInstanceCache() {
+        return cache;
     }
 }

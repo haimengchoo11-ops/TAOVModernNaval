@@ -1,9 +1,12 @@
 package TAOVMN.block.entity;
 
 import java.util.Comparator;
+import java.util.UUID;
 
 import TAOVMN.entity.ShaoMissileProjectile;
+import TAOVMN.util.IffRules;
 import TAOVMN.util.LauncherKind;
+import TAOVMN.util.OwnerTracked;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -44,7 +47,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  * {@link #AIM_SYNC_INTERVAL_TICKS} tick 时同步一次；客户端已有 {@link #smoothRotateOnClient()}
  * 按 {@link CiwsSpec#rotateSpeedDegPerTick()} 插值，4 tick 足以补上 16–20°。
  */
-public abstract class AbstractCiwsBlockEntity extends BlockEntity implements GeoBlockEntity {
+public abstract class AbstractCiwsBlockEntity extends BlockEntity implements GeoBlockEntity, OwnerTracked {
     /**
      * 各型号近防炮的性能参数。
      *
@@ -95,6 +98,9 @@ public abstract class AbstractCiwsBlockEntity extends BlockEntity implements Geo
     private int aimSyncTicks;
     /** 客户端插值角度是否已经从 NBT 播种过（避免每次同步包都把插值打回目标角）。 */
     private boolean clientAnglesSeeded;
+    /** 放置这座炮的玩家；null 表示归属未知（不施加 IFF 保护）。 */
+    @Nullable
+    private UUID ownerId;
 
     protected AbstractCiwsBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -116,6 +122,18 @@ public abstract class AbstractCiwsBlockEntity extends BlockEntity implements Geo
     /** GeckoLib 炮管俯仰骨骼名（供渲染模型使用）。 */
     public String cannonBone() {
         return spec().cannonBone();
+    }
+
+    @Override
+    @Nullable
+    public UUID getOwnerId() {
+        return ownerId;
+    }
+
+    @Override
+    public void setOwnerId(@Nullable UUID ownerId) {
+        this.ownerId = ownerId;
+        setChanged();
     }
 
     // ---- 主循环 ----
@@ -189,12 +207,15 @@ public abstract class AbstractCiwsBlockEntity extends BlockEntity implements Geo
         Vec3 turretCenter = Vec3.atCenterOf(currentPos);
         this.targetMissile = level instanceof ServerLevel serverLevel
                 ? ShaoMissileProjectile.activeWithin(serverLevel, turretCenter, scanRange).stream()
+                        // 不打自己人发射的弹：否则同舰齐射/连续拦截会互相抵消
+                        .filter(projectile -> !IffRules.isSameOwner(this.ownerId, projectile.getOwnerId()))
                         .min(Comparator.comparingDouble(projectile -> projectile.position().distanceToSqr(turretCenter)))
                         .orElse(null)
                 : null;
         this.targetEntity = this.targetMissile == null
                 ? level.getEntitiesOfClass(LivingEntity.class, searchBox,
-                        entity -> entity instanceof Enemy && entity.isAlive() && !entity.isSpectator()).stream()
+                        entity -> entity instanceof Enemy && entity.isAlive() && !entity.isSpectator()
+                                && IffRules.canEngage(this.ownerId, entity)).stream()
                         .min(Comparator.comparingDouble(entity -> entity.distanceToSqr(turretCenter)))
                         .orElse(null)
                 : null;
@@ -265,6 +286,14 @@ public abstract class AbstractCiwsBlockEntity extends BlockEntity implements Geo
                 || (target != null && !target.isAlive())
                 || (missileTarget != null && !missileTarget.isAlive())
                 || fireCooldown > 0) {
+            return;
+        }
+
+        // 防御性 IFF 复检：选靶阶段已过滤，这里再挡一道，避免将来改动选靶逻辑时误伤友军
+        if (target != null && !IffRules.canEngage(this.ownerId, target)) {
+            return;
+        }
+        if (missileTarget != null && IffRules.isSameOwner(this.ownerId, missileTarget.getOwnerId())) {
             return;
         }
 
@@ -344,6 +373,7 @@ public abstract class AbstractCiwsBlockEntity extends BlockEntity implements Geo
         super.load(tag);
         this.targetYaw = tag.getFloat(TAG_TARGET_YAW);
         this.targetPitch = tag.getFloat(TAG_TARGET_PITCH);
+        this.ownerId = OwnerTracked.read(tag);
         // 只在第一次拿到服务端朝向时播种插值角度；之后每次同步包都不能重置，
         // 否则客户端的阻尼插值会被 4 tick 一次的同步反复打回目标角，看起来就是瞬移。
         if (!this.clientAnglesSeeded) {
@@ -358,6 +388,7 @@ public abstract class AbstractCiwsBlockEntity extends BlockEntity implements Geo
         super.saveAdditional(tag);
         tag.putFloat(TAG_TARGET_YAW, this.targetYaw);
         tag.putFloat(TAG_TARGET_PITCH, this.targetPitch);
+        OwnerTracked.write(tag, this.ownerId);
     }
 
     @Override

@@ -1,7 +1,12 @@
 package TAOVMN.block;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import TAOVMN.util.OwnerTracked;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
@@ -9,6 +14,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * 近防炮 / 舰炮方块的公共部分：水平朝向属性、放置时面向玩家、GeckoLib 渲染形状。
@@ -39,5 +45,14 @@ public abstract class AbstractCiwsBlock extends BaseEntityBlock {
     @Override
     public RenderShape getRenderShape(BlockState state) {
         return RenderShape.ENTITYBLOCK_ANIMATED;
+    }
+
+    /** 记录放置者作为归属，供 IFF 判定使用（非玩家放置时保持归属未知）。 */
+    @Override
+    public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (!level.isClientSide) {
+            OwnerTracked.assign(level.getBlockEntity(pos), placer);
+        }
     }
 }

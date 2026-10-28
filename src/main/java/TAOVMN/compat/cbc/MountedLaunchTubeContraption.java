@@ -1,13 +1,11 @@
 package TAOVMN.compat.cbc;
 
 import TAOVMN.block.LaunchTubeBlock;
-import TAOVMN.block.MissileBlock;
-import TAOVMN.block.RakLauncherBlock;
 import TAOVMN.block.entity.LaunchTubeBlockEntity;
 import TAOVMN.block.entity.P1DirectorBlockEntity;
 import TAOVMN.block.entity.RadarBlockEntity;
-import TAOVMN.entity.GenericMissileEntity;
-import TAOVMN.entity.P1MissileEntity;
+import TAOVMN.entity.MissileFactory;
+import TAOVMN.entity.ShaoMissileProjectile;
 import TAOVMN.registry.ModBlockEntities;
 import TAOVMN.registry.ModBlocks;
 import TAOVMN.registry.ModItems;
@@ -52,16 +50,11 @@ public class MountedLaunchTubeContraption extends AbstractMountedCannonContrapti
     @Override
     public boolean assemble(Level level, BlockPos startPos) throws AssemblyException {
         BlockState startState = level.getBlockState(startPos);
-        if (!(startState.getBlock() instanceof LaunchTubeBlock) && !(startState.getBlock() instanceof MissileBlock)) {
+        if (!(startState.getBlock() instanceof LaunchTubeBlock)) {
             return false;
         }
 
-        Direction initialDir = Direction.NORTH;
-        if (startState.getBlock() instanceof LaunchTubeBlock) {
-            initialDir = startState.getValue(LaunchTubeBlock.FACING);
-        } else if (startState.getBlock() instanceof MissileBlock) {
-            initialDir = startState.getValue(MissileBlock.FACING);
-        }
+        Direction initialDir = startState.getValue(LaunchTubeBlock.FACING);
         this.initialOrientation = initialDir;
         this.startPos = startPos;
         this.bounds = createInitialLightingBounds();
@@ -80,14 +73,6 @@ public class MountedLaunchTubeContraption extends AbstractMountedCannonContrapti
                     if (be instanceof LaunchTubeBlockEntity tubeBE && tubeBE.hasMissile()) {
                         loadedMissiles.put(current.immutable().subtract(startPos), tubeBE.getLoadedMissile().copy());
                     }
-                    current.move(initialDir);
-                    continue;
-                }
-            } else if (state.getBlock() instanceof MissileBlock missile) {
-                if (missile.getAxis(state) == axis) {
-                    collected.add(current.immutable());
-                    ItemStack missileStack = new ItemStack(state.getBlock());
-                    loadedMissiles.put(current.immutable().subtract(startPos), missileStack);
                     current.move(initialDir);
                     continue;
                 }
@@ -178,40 +163,17 @@ public class MountedLaunchTubeContraption extends AbstractMountedCannonContrapti
             }
         }
 
-        GenericMissileEntity genericMissile = RakLauncherBlock.createGenericMissile(missileStack, level, muzzleWorld.x, muzzleWorld.y, muzzleWorld.z);
-        if (genericMissile != null) {
-            genericMissile.setFuzeTicks(resolvedFuze);
-            if (!cbcFuze.isEmpty()) {
-                genericMissile.setFuze(cbcFuze);
-            }
-            genericMissile.applyProfile(profile);
-            genericMissile.setGuidanceTuning(
-                    MissileProfile.resolveLockHoldTicks(missileStack, P1MissileEntity.defaultLockHoldTicks()),
-                    MissileProfile.resolveSwitchAdvantageDistance(missileStack, P1MissileEntity.defaultSwitchAdvantageDistance()),
-                    MissileProfile.resolveForceSwitchDistance(missileStack, P1MissileEntity.defaultForceSwitchDistance())
-            );
-            if (targetUuid != null) {
-                genericMissile.setAssignedTarget(targetUuid);
-            }
-            if (targetPos != null) {
-                genericMissile.setDesignatedTargetPos(targetPos);
-            }
-            genericMissile.setLauncherOrigin(muzzleWorld);
-            genericMissile.setDeltaMovement(launchVelocity);
-            genericMissile.setItem(missileStack.copyWithCount(1));
-            genericMissile.setFuzeInstalled(fuzeInstalled);
-            level.addFreshEntity(genericMissile);
-        } else {
-            P1MissileEntity missile = new P1MissileEntity(level, muzzleWorld.x, muzzleWorld.y, muzzleWorld.z);
+        ShaoMissileProjectile missile = MissileFactory.create(missileStack, level, muzzleWorld);
+        if (missile != null) {
             missile.setFuzeTicks(resolvedFuze);
             if (!cbcFuze.isEmpty()) {
                 missile.setFuze(cbcFuze);
             }
             missile.applyProfile(profile);
             missile.setGuidanceTuning(
-                    MissileProfile.resolveLockHoldTicks(missileStack, P1MissileEntity.defaultLockHoldTicks()),
-                    MissileProfile.resolveSwitchAdvantageDistance(missileStack, P1MissileEntity.defaultSwitchAdvantageDistance()),
-                    MissileProfile.resolveForceSwitchDistance(missileStack, P1MissileEntity.defaultForceSwitchDistance())
+                    MissileProfile.resolveLockHoldTicks(missileStack, ShaoMissileProjectile.defaultLockHoldTicks()),
+                    MissileProfile.resolveSwitchAdvantageDistance(missileStack, ShaoMissileProjectile.defaultSwitchAdvantageDistance()),
+                    MissileProfile.resolveForceSwitchDistance(missileStack, ShaoMissileProjectile.defaultForceSwitchDistance())
             );
             if (targetUuid != null) {
                 missile.setAssignedTarget(targetUuid);
@@ -220,10 +182,11 @@ public class MountedLaunchTubeContraption extends AbstractMountedCannonContrapti
                 missile.setDesignatedTargetPos(targetPos);
             }
             missile.setLauncherOrigin(muzzleWorld);
-            missile.setDeltaMovement(launchVelocity);
-            missile.setItem(missileStack.copyWithCount(1));
+            // CBC 悬挂炮没有可靠的玩家归属 API，这里保持归属未知（= 不受 IFF 保护，行为与之前一致）
+            missile.setOwnerId(null);
+            missile.setVelocity(launchVelocity);
             missile.setFuzeInstalled(fuzeInstalled);
-            level.addFreshEntity(missile);
+            missile.spawn();
         }
 
         level.playSound(null, BlockPos.containing(muzzleWorld), SoundEvents.FIRECHARGE_USE, SoundSource.BLOCKS, 1.0F, 1.0F);
