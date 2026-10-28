@@ -22,6 +22,31 @@ minecraft {
         client {
             workingDirectory project.file('run')
             property 'forge.logging.console.level', 'debug'
+            jvmArgs = ['-Xms2G', '-Xmx8G']
+            mods {
+                taovmodernnaval {
+                    source sourceSets.main
+                }
+            }
+        }
+        clientFast {
+            workingDirectory project.file('run-fast')
+            property 'forge.logging.console.level', 'info'
+            jvmArgs = ['-Xms2G', '-Xmx8G']
+            mods {
+                taovmodernnaval {
+                    source sourceSets.main
+                }
+            }
+        }
+        // 无头专用服务器：跳过客户端 mixin（本工作区的 Create/VS 客户端 mixin 在 dev 下会崩），
+        // 用于验证注册表、数据包、方块实体与火控逻辑能否正常加载运行。
+        // 主类与模块参数由下面的 parent(0, null, 'server') 继承，这里只描述差异。
+        serverFast {
+            workingDirectory project.file('run-fast-server')
+            property 'forge.logging.console.level', 'info'
+            jvmArgs = ['-Xms2G', '-Xmx4G']
+            args '--nogui', '--port', '25599'
             mods {
                 taovmodernnaval {
                     source sourceSets.main
@@ -31,19 +56,246 @@ minecraft {
     }
 }
 
+// clientFast 是自定义 run 名称：userdev config 里没有同名配置，因此不会自动继承主类
+// （BootstrapLauncher）与模块参数（--add-opens/--add-exports）。把内置 client run 设为父配置，
+// ForgeGradle 会在项目评估后调用 mergeParents 补齐这些启动参数。
+minecraft.runs.named('clientFast').configure {
+    parent(0, null, 'client')
+}
+
+// 显式创建内置 server run：RunConfig 容器不允许在 deferred configure 里新建条目，
+// 因此提前把 server 建出来，serverFast 才能把它当父配置继承模块参数与主类。
+minecraft.runs.maybeCreate('server')
+minecraft.runs.named('serverFast').configure {
+    parent(0, null, 'server')
+}
+
 repositories {
     maven { url = 'https://maven.minecraftforge.net' }
     maven { url = 'https://maven.blamejared.com' }
+    maven { url = 'https://modmaven.dev' }
+    maven { url = 'https://maven.tterrag.com/' }
     maven { url = 'https://dl.cloudsmith.io/public/geckolib3/geckolib/maven/' }
     mavenCentral()
 }
 
 dependencies {
     minecraft 'net.minecraftforge:forge:1.20.1-47.3.0'
-    compileOnly 'mezz.jei:jei-1.20.1-forge-api:15.3.0.4'
-    runtimeOnly fg.deobf('mezz.jei:jei-1.20.1-forge:15.3.0.4')
-    implementation fg.deobf('software.bernie.geckolib:geckolib-forge-1.20.1:4.7')
-    compileOnly files('libs/createbigcannons-5.8.3edited.jar')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    compileOnly fg.deobf(files('libs/jei-1.20.1-forge-15.3.0.4.jar'))
+    implementation fg.deobf(files('libs/geckolib-forge-1.20.1-4.7.jar'))
+    implementation fg.deobf(files("libs/Shao's Projectile Lib Forge-1.20.1-1.6.4-all.jar"))
+    implementation files('libs/create-1.20.1-0.5.1.j.jar')
+
+    def localMods = fileTree('run/mods') {
+        include 'create-*.jar'
+        include 'cc-tweaked*.jar'
+        include 'create_tweaked_controllers*.jar'
+        include 'createbigcannons*.jar'
+    }
+    def localLibs = fileTree('libs') {
+        include 'createbigcannons*.jar'
+        include 'create-*.jar'
+    }
+
+    compileOnly localMods + localLibs
+    runtimeOnly localMods + localLibs
+    implementation fg.deobf(files('libs/createbigcannons-5.8.3edited.jar'))
+}
+
+def devRunExcludedJarPatterns = [
+    'alltheleaks*.jar',
+    'fancymenu*.jar',
+    'oculus*.jar',
+    'oculus-flywheel-compat*.jar',
+    'embeddium*.jar',
+    'embeddiumplus*.jar',
+    'asyncparticles*.jar',
+    'immediatelyfast*.jar',
+    'modernfix*.jar',
+    'inventoryprofilesnext*.jar',
+    'eureka*.jar',
+    'drivebywire*.jar',
+    'clockwork*.jar',
+    'clockworkadditions*.jar',
+    'trackwork*.jar',
+    'cc_vs*.jar',
+    'vsafe*.jar',
+    'vs_addition*.jar',
+    'the adventure of valkyrien-skies*.jar',
+    // CBC 插件族通配排除：cbcmoreshells / cbcmodernwarfare / cbc_at / CBCmoreshells（中文前缀文件名）
+    // 按 'cbc' 子串匹配（与 cleanup_runtime.ps1 一致）；createbigcannons 核心不含 'cbc' 子串，不会被误排除
+    '*cbc*.jar',
+    'ottotaov*.jar',
+    'taov_core*.jar',
+    // Shao's Lib 由 classpath（implementation fg.deobf）提供，排除 run/mods 副本避免重复扫描
+    "shao's projectile lib*.jar",
+    'warshiparise*.jar',
+    // [机械动力：雷达] Radars（与 cleanup_runtime.ps1 的清理范围保持一致）
+    '*radars*.jar'
+]
+
+/**
+ * 极速冒烟测试运行时：只放"本模组运行必需"的 mod，避免 93 个 jar 的完整 run/mods 拖慢启动。
+ * 只从 run/mods 取已可用的 mod jar（libs/ 里是同名但未重映射的开发包，
+ * 直接进 mods 会让 Create 的 mixin 找不到映射名而崩溃）。
+ */
+def fastDevRuntimeJarPatterns = [
+    'create-1.20.1-*.j.jar',
+    'createbigcannons-*.jar',
+    "shao's projectile lib*.jar",
+    'geckolib-*.jar',
+    'ritchiesprojectilelib-*.jar',
+    'jei-*.jar'
+]
+
+tasks.register('prepareFastDevRuntime', Sync) {
+    outputs.upToDateWhen { false }
+    inputs.property('fastDevRuntimeJarPatterns', fastDevRuntimeJarPatterns.join(','))
+
+    from(project.fileTree('run/mods') {
+        include fastDevRuntimeJarPatterns
+    })
+    into(project.file('run-fast/mods'))
+}
+
+tasks.matching { it.name == 'runClientFast' }.configureEach {
+    dependsOn(tasks.named('prepareFastDevRuntime'))
+    dependsOn(tasks.named('verifyRequiredDevMods'))
+}
+
+tasks.matching { it.name == 'runServerFast' }.configureEach {
+    dependsOn(tasks.named('prepareFastDevRuntime'))
+    dependsOn(tasks.named('verifyRequiredDevMods'))
+}
+
+tasks.register('syncLocalDevMods', Sync) {
+    outputs.upToDateWhen { false }
+    inputs.property('devRunExcludedJarPatterns', devRunExcludedJarPatterns.join(','))
+
+    def runModsDir = project.file('run/mods')
+
+    doFirst {
+        if (runModsDir.exists()) {
+            project.fileTree(runModsDir) {
+                include '*.jar'
+            }.files.each { jarFile ->
+                jarFile.delete()
+            }
+        }
+    }
+
+    from(project.fileTree('libs') {
+        caseSensitive = false
+        include '*.jar'
+        devRunExcludedJarPatterns.each { pattern ->
+            exclude pattern
+        }
+    })
+    into(runModsDir)
+
+    doLast {
+        project.fileTree(runModsDir) {
+            include '*.jar'
+        }.files.each { jarFile ->
+            def excluded = devRunExcludedJarPatterns.any { pattern ->
+                org.apache.tools.ant.types.selectors.SelectorUtils.matchPath(
+                    pattern.toLowerCase(java.util.Locale.ROOT),
+                    jarFile.name.toLowerCase(java.util.Locale.ROOT),
+                    true
+                )
+            }
+
+            if (excluded) {
+                jarFile.delete()
+            }
+        }
+    }
+}
+
+tasks.register('verifyRequiredDevMods') {
+    doLast {
+        def libsDir = project.file('libs')
+        def createModCandidates = project.fileTree(libsDir) {
+            include '*.jar'
+        }.files.findAll {
+            def lower = it.name.toLowerCase()
+            lower.startsWith('create-') || lower.startsWith('create_')
+        }
+
+        if (createModCandidates.isEmpty()) {
+            throw new GradleException("Missing required Create mod jar in libs/. CBC depends on mod id 'create'. Place a Create 1.20.1 jar into libs/ and rerun runClient.")
+        }
+    }
+}
+
+tasks.register('reportExcludedDevMods') {
+    doLast {
+        def excluded = project.fileTree('libs') {
+            include '*.jar'
+        }.files.findAll { jarFile ->
+            devRunExcludedJarPatterns.any { pattern ->
+                org.apache.tools.ant.types.selectors.SelectorUtils.matchPath(
+                    pattern.toLowerCase(java.util.Locale.ROOT),
+                    jarFile.name.toLowerCase(java.util.Locale.ROOT),
+                    true
+                )
+            }
+        }
+
+        println 'Excluded dev mods from run/mods:'
+        if (excluded.isEmpty()) {
+            println '  (none)'
+        } else {
+            excluded.each { println "  - ${it.name}" }
+        }
+    }
+}
+
+tasks.register('prepareDevRuntime') {
+    group = 'taov'
+    description = 'Prepares libs-based dev runtime with compatibility filters and dependency checks.'
+    dependsOn(tasks.named('syncLocalDevMods'))
+    dependsOn(tasks.named('verifyRequiredDevMods'))
+    dependsOn(tasks.named('reportExcludedDevMods'))
+}
+
+tasks.register('fixAndPackage') {
+    group = 'taov'
+    description = 'Runs compatibility preparation and builds release-ready jars automatically.'
+    dependsOn(tasks.named('prepareDevRuntime'))
+    dependsOn(tasks.named('clean'))
+    dependsOn(tasks.named('build'))
+
+    doLast {
+        def libsDir = project.file('build/libs')
+        println 'Packaged artifacts:'
+        if (!libsDir.exists()) {
+            println '  (build/libs not found)'
+            return
+        }
+
+        def jars = libsDir.listFiles()?.findAll { it.name.toLowerCase().endsWith('.jar') } ?: []
+        if (jars.isEmpty()) {
+            println '  (no jar artifacts found)'
+            return
+        }
+
+        jars.each { println "  - ${it.name}" }
+    }
+}
+
+tasks.named('prepareDevRuntime').configure {
+    mustRunAfter(tasks.named('clean'))
+}
+
+tasks.named('build').configure {
+    mustRunAfter(tasks.named('prepareDevRuntime'))
+}
+
+tasks.matching { it.name == 'runClient' }.configureEach {
+    dependsOn(tasks.named('syncLocalDevMods'))
+    dependsOn(tasks.named('verifyRequiredDevMods'))
 }
 
 tasks.named('processResources', ProcessResources).configure {
@@ -65,4 +317,8 @@ tasks.named('processResources', ProcessResources).configure {
     filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
         expand replaceProperties
     }
+}
+
+tasks.named('test', Test).configure {
+    useJUnitPlatform()
 }
