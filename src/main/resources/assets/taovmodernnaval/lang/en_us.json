@@ -89,6 +89,8 @@
     "gui.taovmodernnaval.scope_range": "Range: %s m",
     "gui.taovmodernnaval.no_lock": "Primary: no lock",
     "gui.taovmodernnaval.locked_target": "Primary: %s, %s, %s",
+    "gui.taovmodernnaval.threat": "Primary threat %s",
+    "gui.taovmodernnaval.threat_alert": "!! INCOMING MISSILE ×%s",
     "gui.taovmodernnaval.fire_channels": "Fire Channels",
     "gui.taovmodernnaval.no_channels": "No launchers nearby",
     "gui.taovmodernnaval.no_contacts": "No contacts",

@@ -484,6 +484,8 @@ public final class ShaoMissileProjectile extends HEShellShaojectile {
                         && !candidate.isSpectator()
                         && candidate.distanceToSqr(origin) <= radius * radius
                         && candidate.position().distanceToSqr(launcherOrigin) > profile.iffSafeRadius() * profile.iffSafeRadius()
+                        // 只自主交战「交战对象」（敌对生物或玩家）：否则弹体会去追一头牛
+                        && IffRules.isHostile(candidate)
                         && IffRules.canEngage(ownerId, candidate)
                         && engagesLivingTarget(candidate, origin))
                 .stream()

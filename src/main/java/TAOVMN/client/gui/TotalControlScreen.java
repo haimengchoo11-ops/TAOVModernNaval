@@ -153,6 +153,14 @@ public class TotalControlScreen extends Screen {
                         String.format("%.1f", controller.getCurrentTargetPos().y),
                         String.format("%.1f", controller.getCurrentTargetPos().z)).getString();
         graphics.drawString(this.font, trim(target, 418), left + 12, top + 40, TEXT_DIM);
+
+        // 威胁分数此前只算不显示（getSelectedThreat 全项目 0 调用点）：
+        // 把主目标的排序依据摊开，玩家才知道"为什么先打这个"。
+        ScopeContact primary = primaryContact(controller.getContacts());
+        String threat = Component.translatable("gui.taovmodernnaval.threat",
+                primary == null ? "-" : String.format("%.1f", primary.threat())).getString();
+        graphics.drawString(this.font, threat, left + 12, top + 52,
+                primary == null ? TEXT_DIM : TEXT_WARN);
     }
 
     // ---- 示波器 ----

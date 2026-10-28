@@ -23,11 +23,13 @@ import org.jetbrains.annotations.Nullable;
  *
  * <p>工作周期：
  * <ol>
- *   <li>每 tick 旋转雷达天线（{@value #RADAR_SCAN_SPEED_DEGREES}°/tick）；</li>
  *   <li>每 {@link #scanInterval()} tick 扫描并刷新被跟踪目标；</li>
  *   <li>每 tick 更新主目标锁定强度；</li>
  *   <li>每 {@link #BROADCAST_INTERVAL} tick 向 {@value #FIRE_CONTROL_RANGE} 格内的在飞导弹分发火控参数。</li>
  * </ol>
+ *
+ * <p>天线旋转不在这里维护：客户端按游戏时间本地推算（见 {@code AntennaRotation}），
+ * 因此既不需要 NBT 字段，也不需要同步包。
  *
  * <p>导弹端由 {@link ShaoMissileProjectile#setDirectorTarget} 接收；参数超过
  * {@value #FIRE_CONTROL_MEMORY_TICKS} tick 未更新即自动过期，参见导弹端的判定逻辑。
@@ -43,14 +45,11 @@ public class P1DirectorBlockEntity extends RadarBlockEntity {
     public static final float LOCK_STRENGTH_RETAINED = 0.3F;
     /** 导弹侧认为火控参数仍然有效的时长（tick），与导弹端保持一致。 */
     public static final int FIRE_CONTROL_MEMORY_TICKS = 200;
-    /** 雷达天线扫描速度（度/tick）。 */
-    private static final float RADAR_SCAN_SPEED_DEGREES = 3.0F;
     /** 判定"主目标被替换"的位置容差（格）：目标正常移动不应重置锁定，只有明显跳变才算切换。 */
     private static final double TARGET_SWITCH_TOLERANCE = 4.0D;
     /** 位置容差的平方，用于与 distanceToSqr 同量纲比较。 */
     private static final double TARGET_SWITCH_TOLERANCE_SQR = TARGET_SWITCH_TOLERANCE * TARGET_SWITCH_TOLERANCE;
 
-    private static final String TAG_RADAR_ANGLE = "RadarAngle";
     private static final String TAG_LOCK_STRENGTH = "LockStrength";
     private static final String TAG_TRACKED_COUNT = "TrackedCount";
     private static final String TAG_PRIMARY_TARGET = "PrimaryTarget";
@@ -58,7 +57,6 @@ public class P1DirectorBlockEntity extends RadarBlockEntity {
     private UUID primaryTargetUuid;
     private Vec3 primaryTargetPos;
     private float lockStrength;
-    private float radarAngle;
     private int broadcastTicks;
 
     public P1DirectorBlockEntity(BlockPos pos, BlockState state) {
@@ -76,7 +74,6 @@ public class P1DirectorBlockEntity extends RadarBlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, P1DirectorBlockEntity director) {
-        director.radarAngle = (director.radarAngle + RADAR_SCAN_SPEED_DEGREES) % 360.0F;
         RadarBlockEntity.tick(level, pos, state, director);
 
         if (!(level instanceof ServerLevel serverLevel)) {
@@ -195,11 +192,6 @@ public class P1DirectorBlockEntity extends RadarBlockEntity {
         return lockStrength;
     }
 
-    /** 雷达天线当前角度（度），供渲染与火控界面使用。 */
-    public float getRadarAngle() {
-        return radarAngle;
-    }
-
     @Nullable
     public Vec3 getPrimaryTargetPos() {
         return primaryTargetPos;
@@ -228,7 +220,6 @@ public class P1DirectorBlockEntity extends RadarBlockEntity {
     @Override
     protected void saveAdditional(CompoundTag tag) {
         super.saveAdditional(tag);
-        tag.putFloat(TAG_RADAR_ANGLE, radarAngle);
         tag.putFloat(TAG_LOCK_STRENGTH, lockStrength);
         tag.putInt(TAG_TRACKED_COUNT, getTrackedCount());
         if (primaryTargetUuid != null) {
@@ -239,7 +230,6 @@ public class P1DirectorBlockEntity extends RadarBlockEntity {
     @Override
     public void load(CompoundTag tag) {
         super.load(tag);
-        radarAngle = Mth.clamp(tag.getFloat(TAG_RADAR_ANGLE), 0.0F, 360.0F);
         lockStrength = Mth.clamp(tag.getFloat(TAG_LOCK_STRENGTH), 0.0F, 1.0F);
         primaryTargetUuid = tag.hasUUID(TAG_PRIMARY_TARGET) ? tag.getUUID(TAG_PRIMARY_TARGET) : null;
         primaryTargetPos = null;
@@ -249,7 +239,6 @@ public class P1DirectorBlockEntity extends RadarBlockEntity {
     public CompoundTag getUpdateTag() {
         CompoundTag tag = super.getUpdateTag();
         tag.putFloat(TAG_LOCK_STRENGTH, lockStrength);
-        tag.putFloat(TAG_RADAR_ANGLE, radarAngle);
         return tag;
     }
 }

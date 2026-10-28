@@ -5,7 +5,11 @@ import java.util.List;
 import java.util.UUID;
 
 import TAOVMN.entity.ShaoMissileProjectile;
+import TAOVMN.network.ModNetwork;
+import TAOVMN.network.S2CThreatAlertPacket;
 import TAOVMN.registry.ModBlockEntities;
+import TAOVMN.util.IffRules;
+import TAOVMN.util.OwnerTracked;
 import TAOVMN.util.TargetDomain;
 import TAOVMN.util.ThreatRanking;
 import net.minecraft.core.BlockPos;
@@ -15,20 +19,21 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.PacketDistributor;
 import org.jetbrains.annotations.Nullable;
 import software.bernie.geckolib.animatable.GeoBlockEntity;
 import software.bernie.geckolib.core.animatable.instance.AnimatableInstanceCache;
 import software.bernie.geckolib.core.animation.AnimatableManager;
 import software.bernie.geckolib.util.GeckoLibUtil;
 
-public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity {
+public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity, OwnerTracked {
     private static final String TAG_TARGET = "SelectedTarget";
     private static final String TAG_IFF = "IffEnabled";
     private static final String TAG_AIR_TRACKED = "AirTrackedCount";
@@ -37,6 +42,8 @@ public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity {
     private static final String TAG_CONTACTS = "Contacts";
     /** 同步到客户端的接触点数量上限，避免大型空战时同步包过大。 */
     private static final int MAX_SYNCED_CONTACTS = 24;
+    /** 来袭告警在客户端残留的时长（tick）；略大于扫描间隔（20），威胁消失后会自然淡出。 */
+    private static final int ALERT_TTL_TICKS = 50;
     /** 判定"空中目标"的高度带（格）：离雷达中心高出这么多且不在地面，即视为空中目标。 */
     private static final double AIRBORNE_ALTITUDE_BAND = 3.0D;
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
@@ -50,6 +57,8 @@ public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity {
     private TargetDomain selectedDomain;
     private boolean iffEnabled = true;
     private int scanTicks;
+    /** 放置这台雷达的玩家；null 表示归属未知（不施加 IFF 保护）。 */
+    private java.util.UUID ownerId;
 
     public RadarBlockEntity(BlockPos pos, BlockState state) {
         this(ModBlockEntities.RADAR_BLOCK.get(), pos, state);
@@ -105,7 +114,7 @@ public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity {
         List<LivingEntity> candidates = level.getEntitiesOfClass(LivingEntity.class, bounds, entity ->
                 entity.isAlive()
                         && !entity.isSpectator()
-                        && (!iffEnabled || entity instanceof Enemy)
+                        && acceptsAsTarget(entity)
                         && entity.distanceToSqr(radarCenter) <= rangeSqr);
 
         // 按威胁排序选主目标（而非"最近优先"）：来袭弹体 > 飞机 > 水面/地面
@@ -153,8 +162,55 @@ public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity {
         selectedTargetPos = best == null ? null : best.position();
         selectedDomain = best == null ? null : best.targetDomain();
         selectedThreat = best == null ? 0.0D : best.threat();
+        if (incomingMissiles > 0) {
+            warnIncomingMissiles(level, radarCenter, incomingMissiles);
+        }
         setChanged();
         level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+    }
+
+    /**
+     * 把"有 N 枚弹体正在接近"推送给扫描范围内的玩家，供客户端 HUD 显示告警。
+     *
+     * <p>弹体不是原版实体、且 {@code ACTIVE} 集合只在服务端维护，客户端没有别的办法
+     * 自己发现来袭导弹，所以这条推送是告警唯一的数据来源。
+     */
+    private void warnIncomingMissiles(ServerLevel level, Vec3 radarCenter, int count) {
+        double range = scanRange();
+        double rangeSqr = range * range;
+        for (ServerPlayer player : level.players()) {
+            if (player.isSpectator() || player.distanceToSqr(radarCenter) > rangeSqr) {
+                continue;
+            }
+            ModNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
+                    new S2CThreatAlertPacket(count, ALERT_TTL_TICKS));
+        }
+    }
+
+    /**
+     * IFF 过滤：IFF 开启时只接受「交战对象」（{@link IffRules#isHostile}：敌对生物或玩家），
+     * 并排除友军；IFF 关闭时保持旧行为（全部生物）。
+     *
+     * <p>此前这里写死 {@code entity instanceof Enemy}，导致<b>玩家永远进不了雷达</b>——
+     * 而这套武器系统（反舰弹、反导近炸、火力通道）实际上只对"另一个玩家阵营"有意义。
+     */
+    private boolean acceptsAsTarget(LivingEntity entity) {
+        if (!iffEnabled) {
+            return true;
+        }
+        return IffRules.isHostile(entity) && IffRules.canEngage(ownerId, entity);
+    }
+
+    @Override
+    @Nullable
+    public java.util.UUID getOwnerId() {
+        return ownerId;
+    }
+
+    @Override
+    public void setOwnerId(@Nullable java.util.UUID ownerId) {
+        this.ownerId = ownerId;
+        setChanged();
     }
 
     /** 接触点过多时只保留最近的若干个（同步包大小可控，界面点也不会糊成一团）。 */
@@ -221,6 +277,7 @@ public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity {
         if (selectedDomain != null) {
             tag.putString(TAG_DOMAIN, selectedDomain.key());
         }
+        OwnerTracked.write(tag, ownerId);
     }
 
     @Override
@@ -233,6 +290,7 @@ public class RadarBlockEntity extends BlockEntity implements GeoBlockEntity {
         selectedDomain = tag.contains(TAG_DOMAIN)
                 ? TargetDomain.byKey(tag.getString(TAG_DOMAIN), null)
                 : null;
+        ownerId = OwnerTracked.read(tag);
         readContacts(tag);
     }
 

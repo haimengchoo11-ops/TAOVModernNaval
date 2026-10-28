@@ -87,6 +87,8 @@
     "gui.taovmodernnaval.scope_range": "量程：%s m",
     "gui.taovmodernnaval.no_lock": "主目标：无锁定",
     "gui.taovmodernnaval.locked_target": "主目标：%s, %s, %s",
+    "gui.taovmodernnaval.threat": "主目标威胁 %s",
+    "gui.taovmodernnaval.threat_alert": "!! 来袭导弹 ×%s",
     "gui.taovmodernnaval.fire_channels": "火力通道",
     "gui.taovmodernnaval.no_channels": "附近没有可用发射装置",
     "gui.taovmodernnaval.no_contacts": "无接触点",

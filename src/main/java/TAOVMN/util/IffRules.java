@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.OwnableEntity;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import org.jetbrains.annotations.Nullable;
 
@@ -46,6 +47,29 @@ public final class IffRules {
      */
     public static boolean isSameOwner(@Nullable UUID a, @Nullable UUID b) {
         return a != null && b != null && a.equals(b);
+    }
+
+    /**
+     * 这个实体是否属于「交战对象」，即战舰火控应当把它当目标看待。
+     *
+     * <p>这是本模组此前缺失的一环：雷达与近防炮原先硬编码 {@code entity instanceof Enemy}，
+     * 而 {@link Enemy} 只覆盖原版敌对生物——<b>玩家永远不在其中</b>。结果是这套为舰队对抗设计的
+     * 武器系统在 PvP 场景下"看不见敌舰上的人"，雷达显示 0 个目标。
+     *
+     * <p>现在定义两类交战对象：
+     * <ul>
+     *   <li>{@link Enemy}：原版敌对生物（僵尸、骷髅等），保留 PvE 能力；</li>
+     *   <li>{@link Player}：玩家。是否真的可以开火由 {@link #canEngage(UUID, Entity)} 进一步按归属过滤，
+     *       因此友军玩家仍不会被锁定。</li>
+     * </ul>
+     *
+     * <p>中立生物（牛、羊等）不算交战对象——否则导弹会去追一头牛。
+     */
+    public static boolean isHostile(@Nullable Entity target) {
+        if (target == null || !target.isAlive() || target.isSpectator()) {
+            return false;
+        }
+        return target instanceof Enemy || target instanceof Player;
     }
 
     /**

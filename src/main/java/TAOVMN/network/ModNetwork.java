@@ -27,5 +27,10 @@ public final class ModNetwork {
                 .decoder(ServerboundFireChannelPacket::new)
                 .consumerMainThread(ServerboundFireChannelPacket::handle)
                 .add();
+        CHANNEL.messageBuilder(S2CThreatAlertPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(S2CThreatAlertPacket::encode)
+                .decoder(S2CThreatAlertPacket::new)
+                .consumerMainThread(S2CThreatAlertPacket::handle)
+                .add();
     }
 }

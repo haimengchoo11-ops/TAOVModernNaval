@@ -12,6 +12,7 @@ import TAOVMN.content.NavalMissileRenderer;
 import TAOVMN.registry.ModBlockEntities;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.EntityRenderersEvent;
+import net.minecraftforge.client.event.RegisterGuiOverlaysEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
@@ -36,5 +37,11 @@ public final class ClientEvents {
         event.registerBlockEntityRenderer(ModBlockEntities.P1_DIRECTOR.get(), P1DirectorGeoRenderer::new);
         event.registerBlockEntityRenderer(ModBlockEntities.AK230_BLOCK.get(), AK230BlockRenderer::new);
         event.registerBlockEntityRenderer(ModBlockEntities.AK630_BLOCK.get(), AK630BlockRenderer::new);
+    }
+
+    /** 来袭导弹告警条（叠加在所有原版 HUD 之上）。 */
+    @SubscribeEvent
+    public static void registerOverlays(RegisterGuiOverlaysEvent event) {
+        event.registerAboveAll("taovmodernnaval_threat_alert", new ThreatAlertOverlay());
     }
 }

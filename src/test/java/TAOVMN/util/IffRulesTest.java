@@ -44,4 +44,11 @@ class IffRulesTest {
         UUID copyOfAlice = UUID.fromString(ALICE.toString());
         assertTrue(IffRules.isSameOwner(ALICE, copyOfAlice));
     }
+
+    @Test
+    void nullOrMissingTargetIsNeverHostile() {
+        assertAll(
+                () -> assertFalse(IffRules.isHostile(null), "null 不是交战对象"),
+                () -> assertFalse(IffRules.canEngage(ALICE, null), "null 目标不可交战"));
+    }
 }
