@@ -1,0 +1,39 @@
+{
+    "parent": "minecraft:item/generated",
+    "textures": {
+        "layer0": "taovmodernnaval:item/missile_fuze"
+    },
+    "display": {
+        "thirdperson_righthand": {
+            "rotation": [0, 90, -35],
+            "translation": [0, 1.5, -0.5],
+            "scale": [0.7, 0.7, 0.7]
+        },
+        "thirdperson_lefthand": {
+            "rotation": [0, 90, 35],
+            "translation": [0, 1.5, -0.5],
+            "scale": [0.7, 0.7, 0.7]
+        },
+        "firstperson_righthand": {
+            "rotation": [0, 90, -55],
+            "translation": [0.5, 0, 0],
+            "scale": [0.6, 0.6, 0.6]
+        },
+        "firstperson_lefthand": {
+            "rotation": [0, 90, 55],
+            "translation": [0.5, 0, 0],
+            "scale": [0.6, 0.6, 0.6]
+        },
+        "gui": {
+            "rotation": [30, 225, 0],
+            "scale": [0.9, 0.9, 0.9]
+        },
+        "ground": {
+            "translation": [0, 3, 0],
+            "scale": [0.5, 0.5, 0.5]
+        },
+        "fixed": {
+            "scale": [0.5, 0.5, 0.5]
+        }
+    }
+}

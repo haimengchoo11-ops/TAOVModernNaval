@@ -8,7 +8,7 @@ version="${mod_version}"
 displayName="TAOVModernNaval"
 authors="choohaimeng"
 description='''
-A Minecraft development project.
+Modern naval warfare addon: missile launch tubes, fire-control radars, P-series anti-ship missiles, CIWS guns and turret systems.
 '''
 
 [[dependencies.taovmodernnaval]]
@@ -26,22 +26,36 @@ ordering="NONE"
 side="BOTH"
 
 [[dependencies.taovmodernnaval]]
-modId="createbigcannons"
+modId="geckolib"
 mandatory=true
+versionRange="[4.7,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.taovmodernnaval]]
+modId="shaolib"
+mandatory=true
+versionRange="[1.6,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.taovmodernnaval]]
+modId="create"
+mandatory=true
+versionRange="[0.5.1,0.6)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.taovmodernnaval]]
+modId="createbigcannons"
+mandatory=false
 versionRange="[0.5.1,)"
 ordering="AFTER"
 side="BOTH"
 
 [[dependencies.taovmodernnaval]]
 modId="valkyrienskies"
-mandatory=true
-versionRange="[0,)"
+mandatory=false
+versionRange="[2,)"
 ordering="AFTER"
 side="BOTH"
-
-[[dependencies.taovmodernnaval]]
-modId="jei"
-mandatory=false
-versionRange="[15.0.0,16.0.0)"
-ordering="AFTER"
-side="CLIENT"

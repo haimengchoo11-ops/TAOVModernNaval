@@ -16,6 +16,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import rbasamoyai.createbigcannons.munitions.AbstractCannonProjectile;
 
 @Mod.EventBusSubscriber(modid = TAOVModernNaval.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+@SuppressWarnings("removal")
 public final class CbcArmorCompatEvents {
     private static final double ARMOR_BREAK_THRESHOLD = 2.1D;
 

@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "facing=down,powered=false": { "model": "taovmodernnaval:block/launch_tube", "x": 180 },
+    "facing=up,powered=false": { "model": "taovmodernnaval:block/launch_tube" },
+    "facing=north,powered=false": { "model": "taovmodernnaval:block/launch_tube", "x": 90 },
+    "facing=south,powered=false": { "model": "taovmodernnaval:block/launch_tube", "x": 90, "y": 180 },
+    "facing=west,powered=false": { "model": "taovmodernnaval:block/launch_tube", "x": 90, "y": 270 },
+    "facing=east,powered=false": { "model": "taovmodernnaval:block/launch_tube", "x": 90, "y": 90 },
+    "facing=down,powered=true": { "model": "taovmodernnaval:block/launch_tube", "x": 180 },
+    "facing=up,powered=true": { "model": "taovmodernnaval:block/launch_tube" },
+    "facing=north,powered=true": { "model": "taovmodernnaval:block/launch_tube", "x": 90 },
+    "facing=south,powered=true": { "model": "taovmodernnaval:block/launch_tube", "x": 90, "y": 180 },
+    "facing=west,powered=true": { "model": "taovmodernnaval:block/launch_tube", "x": 90, "y": 270 },
+    "facing=east,powered=true": { "model": "taovmodernnaval:block/launch_tube", "x": 90, "y": 90 }
+  }
+}

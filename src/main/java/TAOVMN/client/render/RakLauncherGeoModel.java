@@ -5,6 +5,7 @@ import TAOVMN.block.entity.RakLauncherBlockEntity;
 import net.minecraft.resources.ResourceLocation;
 import software.bernie.geckolib.model.GeoModel;
 
+@SuppressWarnings("removal")
 public class RakLauncherGeoModel extends GeoModel<RakLauncherBlockEntity> {
     @Override
     public ResourceLocation getModelResource(RakLauncherBlockEntity animatable) {

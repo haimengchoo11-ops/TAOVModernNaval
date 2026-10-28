@@ -1,0 +1,14 @@
+﻿{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "III",
+    "I I",
+    "III"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "N": { "item": "taovmodernnaval:naval_core_block" }
+  },
+  "result": { "item": "taovmodernnaval:naval_launch_tube" }
+}

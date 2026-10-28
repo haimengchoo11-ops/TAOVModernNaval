@@ -1,0 +1,16 @@
+{
+	"format_version": "1.8.0",
+	"animations": {
+		"animation.Ak230": {
+			"loop": true,
+			"bones": {
+				"AK630TURRET": {
+					"rotation": [0, 0, 0]
+				},
+				"AK630CANNON": {
+					"rotation": [0, 0, 0]
+				}
+			}
+		}
+	}
+}

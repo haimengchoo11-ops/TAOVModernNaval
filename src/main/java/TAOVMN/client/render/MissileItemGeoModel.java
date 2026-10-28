@@ -1,34 +1,32 @@
 package TAOVMN.client.render;
 
 import TAOVMN.TAOVModernNaval;
-import TAOVMN.item.MissileBlockItem;
+import TAOVMN.item.MissileItem;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.BlockItem;
 import net.minecraftforge.registries.ForgeRegistries;
 import software.bernie.geckolib.model.GeoModel;
 
-public class MissileItemGeoModel extends GeoModel<MissileBlockItem> {
-    private String blockName(MissileBlockItem item) {
-        ResourceLocation key = ForgeRegistries.BLOCKS.getKey(((BlockItem) item).getBlock());
-        return key != null ? key.getPath() : "p1_missile";
+@SuppressWarnings("removal")
+public class MissileItemGeoModel extends GeoModel<MissileItem> {
+    private static final String DEFAULT_BLOCK = "p1_missile";
+
+    private static String assetBase(MissileItem item) {
+        ResourceLocation key = ForgeRegistries.ITEMS.getKey(item);
+        return MissileAssetNames.assetBase(key != null ? key.getPath() : DEFAULT_BLOCK);
     }
 
     @Override
-    public ResourceLocation getModelResource(MissileBlockItem item) {
-        return new ResourceLocation(TAOVModernNaval.MODID, "geo/" + blockName(item) + ".geo.json");
+    public ResourceLocation getModelResource(MissileItem item) {
+        return new ResourceLocation(TAOVModernNaval.MODID, "geo/" + assetBase(item) + ".geo.json");
     }
 
     @Override
-    public ResourceLocation getTextureResource(MissileBlockItem item) {
-        String name = blockName(item);
-        if ("p700_missile".equals(name)) {
-            name = "p800_missile";
-        }
-        return new ResourceLocation(TAOVModernNaval.MODID, "textures/item/" + name + ".png");
+    public ResourceLocation getTextureResource(MissileItem item) {
+        return new ResourceLocation(TAOVModernNaval.MODID, "textures/item/" + assetBase(item) + ".png");
     }
 
     @Override
-    public ResourceLocation getAnimationResource(MissileBlockItem item) {
-        return new ResourceLocation(TAOVModernNaval.MODID, "animations/" + blockName(item) + ".animation.json");
+    public ResourceLocation getAnimationResource(MissileItem item) {
+        return new ResourceLocation(TAOVModernNaval.MODID, "animations/" + assetBase(item) + ".animation.json");
     }
 }

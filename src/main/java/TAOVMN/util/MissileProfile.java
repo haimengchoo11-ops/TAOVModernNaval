@@ -13,8 +13,18 @@ public record MissileProfile(
         float blastPower,
         float seekRange,
         float proximityFuse,
-        float iffSafeRadius
+        float iffSafeRadius,
+        TargetDomain domain
 ) {
+    /**
+     * 向后兼容的 6 参数构造器：目标域默认 {@link TargetDomain#UNIVERSAL}。
+     *
+     * <p>既有 P 系列弹药全部走这条路径，因此本轮引入目标域不会改变它们的行为。
+     */
+    public MissileProfile(float maxSpeed, float steering, float blastPower, float seekRange,
+            float proximityFuse, float iffSafeRadius) {
+        this(maxSpeed, steering, blastPower, seekRange, proximityFuse, iffSafeRadius, TargetDomain.UNIVERSAL);
+    }
     private static final String TAG_ROOT = "TaovMissile";
     private static final String TAG_MAX_SPEED = "MaxSpeed";
     private static final String TAG_STEERING = "Steering";
@@ -22,6 +32,7 @@ public record MissileProfile(
     private static final String TAG_SEEK_RANGE = "SeekRange";
     private static final String TAG_PROXIMITY_FUSE = "ProximityFuse";
     private static final String TAG_IFF_SAFE_RADIUS = "IffSafeRadius";
+    private static final String TAG_DOMAIN = "TargetDomain";
     private static final String TAG_LOCK_HOLD_TICKS = "LockHoldTicks";
     private static final String TAG_SWITCH_ADVANTAGE_DISTANCE = "SwitchAdvantageDistance";
     private static final String TAG_FORCE_SWITCH_DISTANCE = "ForceSwitchDistance";
@@ -31,35 +42,69 @@ public record MissileProfile(
     }
 
     public static MissileProfile p1Default() {
-        return new MissileProfile(1.2F, 0.20F, 4.0F, 96.0F, 1.8F, 10.0F);
+        return new MissileProfile(2.4F, 0.20F, 4.0F, 320.0F, 1.8F, 10.0F);
     }
 
     public static MissileProfile p15() {
-        return new MissileProfile(1.24F, 0.24F, 6.0F, 100.0F, 1.8F, 10.0F);
+        return new MissileProfile(2.48F, 0.24F, 6.0F, 340.0F, 1.8F, 10.0F);
     }
 
     public static MissileProfile p30() {
-        return new MissileProfile(1.20F, 0.22F, 7.0F, 104.0F, 1.9F, 10.0F);
+        return new MissileProfile(2.40F, 0.22F, 7.0F, 360.0F, 1.9F, 10.0F);
     }
 
     public static MissileProfile p45() {
-        return new MissileProfile(1.16F, 0.20F, 8.0F, 108.0F, 2.0F, 10.0F);
+        return new MissileProfile(2.32F, 0.20F, 8.0F, 380.0F, 2.0F, 10.0F);
     }
 
     public static MissileProfile p100() {
-        return new MissileProfile(1.08F, 0.18F, 10.0F, 116.0F, 2.1F, 10.0F);
+        return new MissileProfile(2.16F, 0.18F, 10.0F, 420.0F, 2.1F, 10.0F);
     }
 
     public static MissileProfile p300() {
-        return new MissileProfile(1.00F, 0.16F, 13.0F, 124.0F, 2.2F, 10.0F);
+        return new MissileProfile(2.00F, 0.16F, 13.0F, 480.0F, 2.2F, 10.0F);
+    }
+
+    public static MissileProfile p270() {
+        return new MissileProfile(2.04F, 0.17F, 12.0F, 460.0F, 2.2F, 10.0F);
     }
 
     public static MissileProfile p500() {
-        return new MissileProfile(0.94F, 0.15F, 16.0F, 132.0F, 2.4F, 10.0F);
+        return new MissileProfile(1.88F, 0.15F, 16.0F, 560.0F, 2.4F, 10.0F);
     }
 
     public static MissileProfile p700() {
-        return new MissileProfile(0.88F, 0.14F, 20.0F, 140.0F, 2.6F, 10.0F);
+        return new MissileProfile(1.76F, 0.14F, 20.0F, 640.0F, 2.6F, 10.0F);
+    }
+
+    public static MissileProfile p120() {
+        return new MissileProfile(2.36F, 0.21F, 7.5F, 400.0F, 1.9F, 10.0F);
+    }
+
+    public static MissileProfile p800() {
+        return new MissileProfile(1.80F, 0.14F, 22.0F, 720.0F, 2.7F, 10.0F);
+    }
+
+    // ---- 防空弹（目标域 = ANTI_AIR；高速度、高转向、小当量、以近炸为主）----
+
+    /** S-300 的 5V55RM：远程舰空弹。 */
+    public static MissileProfile s300() {
+        return new MissileProfile(3.20F, 0.44F, 6.0F, 260.0F, 4.0F, 12.0F, TargetDomain.ANTI_AIR);
+    }
+
+    /** 9K33「黄蜂」：近程舰空弹，转向最快。 */
+    public static MissileProfile nineK33() {
+        return new MissileProfile(2.90F, 0.52F, 3.5F, 150.0F, 3.0F, 10.0F, TargetDomain.ANTI_AIR);
+    }
+
+    /** 9K60：近程舰空弹。 */
+    public static MissileProfile nineK60() {
+        return new MissileProfile(2.70F, 0.55F, 3.0F, 130.0F, 3.0F, 10.0F, TargetDomain.ANTI_AIR);
+    }
+
+    /** 9M38「山毛榉」：中程舰空弹。 */
+    public static MissileProfile nineM38() {
+        return new MissileProfile(3.00F, 0.46F, 4.5F, 200.0F, 3.5F, 12.0F, TargetDomain.ANTI_AIR);
     }
 
     public static MissileProfile resolve(ItemStack stack) {
@@ -82,6 +127,12 @@ public record MissileProfile(
             base = p500();
         } else if (isTaovMissileItem(stack, "p700_missile")) {
             base = p700();
+        } else if (isTaovMissileItem(stack, "p120_missile")) {
+            base = p120();
+        } else if (isTaovMissileItem(stack, "p270_missile")) {
+            base = p270();
+        } else if (isTaovMissileItem(stack, "p800_missile")) {
+            base = p800();
         } else if (CbcCompat.isSupportedAmmo(stack)) {
             base = CbcCompat.resolveProfile(stack, p300());
         } else {
@@ -112,7 +163,8 @@ public record MissileProfile(
                 readFloat(cfg, TAG_BLAST_POWER, fallback.blastPower),
                 readFloat(cfg, TAG_SEEK_RANGE, fallback.seekRange),
                 readFloat(cfg, TAG_PROXIMITY_FUSE, fallback.proximityFuse),
-                readFloat(cfg, TAG_IFF_SAFE_RADIUS, fallback.iffSafeRadius));
+                readFloat(cfg, TAG_IFF_SAFE_RADIUS, fallback.iffSafeRadius),
+                TargetDomain.byKey(cfg.contains(TAG_DOMAIN) ? cfg.getString(TAG_DOMAIN) : null, fallback.domain()));
     }
 
     public static boolean hasProfileTag(ItemStack stack) {
@@ -132,6 +184,7 @@ public record MissileProfile(
         cfg.putFloat(TAG_SEEK_RANGE, profile.seekRange());
         cfg.putFloat(TAG_PROXIMITY_FUSE, profile.proximityFuse());
         cfg.putFloat(TAG_IFF_SAFE_RADIUS, profile.iffSafeRadius());
+        cfg.putString(TAG_DOMAIN, profile.domain().key());
         root.put(TAG_ROOT, cfg);
     }
 
