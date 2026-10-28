@@ -27,22 +27,15 @@ public final class MissileFireControl {
         return stack.hasTag() && stack.getOrCreateTag().getBoolean(TAG_FUZE_INSTALLED);
     }
 
-    /** 在 origin 附近查找最近的雷达 / 火控指挥仪（水平 radius 格、垂直 radius/2 格）。 */
+    /**
+     * 在 origin 附近查找最近的雷达 / 火控指挥仪（水平 radius 格、垂直 radius/2 格）。
+     *
+     * <p>实现已改为按已加载区块枚举（见 {@link BlockEntityIndex}）：原先逐坐标调用
+     * {@code level.getBlockEntity} 在 r=32 时要做 13.9 万次查找，且对未加载区块会触发同步加载。
+     */
     public static RadarBlockEntity findNearbyRadar(ServerLevel level, BlockPos origin, int radius) {
-        BlockPos min = origin.offset(-radius, -radius / 2, -radius);
-        BlockPos max = origin.offset(radius, radius / 2, radius);
-        RadarBlockEntity nearest = null;
-        double best = Double.MAX_VALUE;
-        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
-            if (level.getBlockEntity(pos) instanceof RadarBlockEntity radar) {
-                double distance = pos.distSqr(origin);
-                if (distance < best) {
-                    best = distance;
-                    nearest = radar;
-                }
-            }
-        }
-        return nearest;
+        int verticalRadius = Math.max(1, radius / 2);
+        return BlockEntityIndex.nearestRadar(level, origin, radius, verticalRadius).orElse(null);
     }
 
     /**

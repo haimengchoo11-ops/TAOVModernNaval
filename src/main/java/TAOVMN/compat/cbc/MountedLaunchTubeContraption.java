@@ -9,6 +9,7 @@ import TAOVMN.entity.ShaoMissileProjectile;
 import TAOVMN.registry.ModBlockEntities;
 import TAOVMN.registry.ModBlocks;
 import TAOVMN.registry.ModItems;
+import TAOVMN.util.BlockEntityIndex;
 import TAOVMN.util.MissileProfile;
 import com.simibubi.create.content.contraptions.AssemblyException;
 import com.simibubi.create.content.contraptions.ContraptionType;
@@ -35,6 +36,7 @@ import rbasamoyai.createbigcannons.cannon_control.contraption.AbstractMountedCan
 import rbasamoyai.createbigcannons.cannon_control.contraption.PitchOrientedContraptionEntity;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,19 +150,28 @@ public class MountedLaunchTubeContraption extends AbstractMountedCannonContrapti
         Vec3 targetPos = null;
         UUID targetUuid = null;
         BlockPos controllerPos = entity.getAnchorVec() != null ? BlockPos.containing(entity.getAnchorVec()) : BlockPos.containing(muzzleWorld);
-        
-        // 查找 48 格范围内的火控 / 雷达
-        for (BlockPos testPos : BlockPos.betweenClosed(controllerPos.offset(-32, -16, -32), controllerPos.offset(32, 16, 32))) {
-            BlockEntity be = level.getBlockEntity(testPos);
-            if (be instanceof P1DirectorBlockEntity director) {
-                targetUuid = director.getSelectedTargetUuid();
-                targetPos = director.getSelectedTargetPos();
-                if (targetPos != null) break;
-            } else if (be instanceof RadarBlockEntity radar) {
-                targetUuid = radar.getSelectedTargetUuid();
-                targetPos = radar.getSelectedTargetPos();
-                if (targetPos != null) break;
-            }
+
+        // 查找 32 格范围内的火控 / 雷达。原先对 65×33×65 = 13.9 万个坐标逐一 getBlockEntity，
+        // 而 Level#getBlockEntity 会为未加载区块触发同步加载；改为按已加载区块枚举。
+        List<BlockEntity> fireControl = BlockEntityIndex.collectAny(level, controllerPos, 32, 16,
+                candidate -> candidate instanceof P1DirectorBlockEntity || candidate instanceof RadarBlockEntity);
+        // 优先 P1 火控指挥仪（专职火控），其次距离最近且确实锁定了目标的雷达
+        BlockEntity chosen = fireControl.stream()
+                .filter(candidate -> candidate instanceof P1DirectorBlockEntity director
+                        && director.getSelectedTargetPos() != null)
+                .findFirst()
+                .orElseGet(() -> fireControl.stream()
+                        .filter(candidate -> candidate instanceof RadarBlockEntity radar
+                                && radar.getSelectedTargetPos() != null)
+                        .min(Comparator.comparingDouble(candidate -> candidate.getBlockPos().distSqr(controllerPos)))
+                        .orElse(null));
+
+        if (chosen instanceof P1DirectorBlockEntity director) {
+            targetUuid = director.getSelectedTargetUuid();
+            targetPos = director.getSelectedTargetPos();
+        } else if (chosen instanceof RadarBlockEntity radar) {
+            targetUuid = radar.getSelectedTargetUuid();
+            targetPos = radar.getSelectedTargetPos();
         }
 
         ShaoMissileProjectile missile = MissileFactory.create(missileStack, level, muzzleWorld);

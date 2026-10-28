@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import TAOVMN.content.weapon.NavalLaunchBlockEntity;
 import TAOVMN.registry.ModBlockEntities;
+import TAOVMN.util.BlockEntityIndex;
 import TAOVMN.util.FireChannel;
 import TAOVMN.util.FireChannelGroup;
 import TAOVMN.util.FireChannelTable;
@@ -148,10 +149,11 @@ public class TotalControlBlockEntity extends BlockEntity {
     /** 扫描附近发射装置并套用编组，重建火力通道列表。 */
     private void scanChannels(ServerLevel serverLevel) {
         List<FireChannelTable.Reading> readings = new ArrayList<>();
-        BlockPos min = worldPosition.offset(-CHANNEL_RANGE, -CHANNEL_RANGE_Y, -CHANNEL_RANGE);
-        BlockPos max = worldPosition.offset(CHANNEL_RANGE, CHANNEL_RANGE_Y, CHANNEL_RANGE);
-        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
-            FireChannelTable.Reading reading = readLauncher(serverLevel.getBlockEntity(pos), pos);
+        // 按已加载区块枚举（见 BlockEntityIndex）：原先 41×21×41 = 35301 次 getBlockEntity，
+        // 而 Level#getBlockEntity 对未加载区块会触发同步加载，船移动时就是区块加载风暴。
+        for (BlockEntity blockEntity : BlockEntityIndex.collectAny(serverLevel, worldPosition,
+                CHANNEL_RANGE, CHANNEL_RANGE_Y, TotalControlBlockEntity::isLauncher)) {
+            FireChannelTable.Reading reading = readLauncher(blockEntity, blockEntity.getBlockPos());
             if (reading != null) {
                 readings.add(reading);
             }
@@ -159,6 +161,14 @@ public class TotalControlBlockEntity extends BlockEntity {
 
         channels.clear();
         channels.addAll(FireChannelTable.assemble(readings, groupAssignments));
+    }
+
+    /** 是否是本模组支持的发射装置；用于扫描阶段提前过滤，避免对每个方块实体都做一次完整翻译。 */
+    private static boolean isLauncher(@Nullable BlockEntity blockEntity) {
+        return blockEntity instanceof RakLauncherBlockEntity
+                || blockEntity instanceof LaunchTubeBlockEntity
+                || blockEntity instanceof AbstractCiwsBlockEntity
+                || blockEntity instanceof NavalLaunchBlockEntity;
     }
 
     /** 把一座方块实体翻译成一条通道读数；不是发射装置时返回 {@code null}。 */
