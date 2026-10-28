@@ -12,7 +12,8 @@ TAOVModernNaval/                     ← 本目录即「正式版」仓库根（
 ├── .slim-work/                      ← ⚠ 精简版旧快照（无 git），内容已并入上面，待删
 ├── .slim-patch/                     ← 历史补丁与提交信息（脚本化改动的存档）
 ├── WORKSPACE.md                     ← 本文件
-└── build_all.ps1                    ← 一次构建两个工程
+├── build_all.bat                    ← 一次构建两个工程（推荐入口）
+└── build_all.ps1                    ← 上面那个 .bat 实际调用的脚本
 ```
 
 ## 两个工程
@@ -31,17 +32,22 @@ TAOVModernNaval/                     ← 本目录即「正式版」仓库根（
 
 ## 构建
 
-```powershell
-# 两个一起（离线，用工作区内的 .gradle-home 缓存）
-.\build_all.ps1
+```bat
+:: 两个一起（离线，用工作区内的 .gradle-home 缓存）
+build_all.bat
 
-# 只构建一个
-.\build_all.ps1 -Target full
-.\build_all.ps1 -Target slim
+:: 只构建一个
+build_all.bat -Target full
+build_all.bat -Target slim
 
-# 首次构建或依赖变动时允许联网
-.\build_all.ps1 -Online
+:: 首次构建或依赖变动时允许联网
+build_all.bat -Online
 ```
+
+> 本机 PowerShell 执行策略是 **Restricted**，直接 `.\build_all.ps1` 会被拒绝
+> （`running scripts is disabled on this system`）。所以入口用 `build_all.bat`，
+> 它只在这一次调用上加 `-ExecutionPolicy Bypass`，不改系统设置。
+> 想直接跑 ps1 的话：`powershell -NoProfile -ExecutionPolicy Bypass -File .\build_all.ps1`
 
 单独构建某个工程也可以，但**必须固定 `GRADLE_USER_HOME`**，否则在受限环境下会因
 `%USERPROFILE%\.gradle` 的 wrapper 锁文件写入被拒而失败：
@@ -52,6 +58,7 @@ cd TAOVModernNavalSlim; .\gradlew.bat build --offline
 ```
 
 产物分别在 `build/libs/` 与 `TAOVModernNavalSlim/build/libs/`（均被各自 `.gitignore` 忽略）。
+实测一次全量构建：正式版 21s、精简版 12s。
 
 ## 素材库 `asset stor/`
 

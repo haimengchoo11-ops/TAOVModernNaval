@@ -46,6 +46,9 @@ $gradleArgs = @('build')
 if (-not $Online) {
     $gradleArgs += '--offline'
 }
+# 关掉文件系统监听：在受限环境里 Gradle 的 File watcher 线程会报
+# "Couldn't open current thread, error = 5" 并让进程在构建结束后仍不退出。
+$gradleArgs += '--no-watch-fs'
 
 $failures = @()
 $summary = @()
