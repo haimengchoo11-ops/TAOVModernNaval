@@ -85,3 +85,7 @@ replay_pid*.log
 /gradle_package_check.txt
 /fuzed_javap.txt
 /runtimeClasspath.txt
+
+# 崩溃报告包（PCL 导出，含 JVM 转储与启动器日志，体积大且含机器信息）
+/错误报告-*.zip
+/.crash-tmp/
