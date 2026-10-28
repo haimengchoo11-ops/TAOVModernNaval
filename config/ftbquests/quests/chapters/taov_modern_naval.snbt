@@ -1,0 +1,270 @@
+{
+	id: "2000000000000001"
+	group: ""
+	order_index: 0
+	filename: "taov_modern_naval"
+	title: "TAOV 现代海军"
+	icon: {
+		id: "taovmodernnaval:radar_block"
+		Count: 1b
+	}
+	default_quest_shape: "circle"
+	default_hide_dependency_lines: false
+	quests: [
+		{
+			id: "2000000000000010"
+			title: "建立搜索网"
+			x: 0.0d
+			y: 0.0d
+			description: [
+				"部署雷达，为舰载武器提供远距离目标搜索与指示。"
+				"任务检查持有雷达物品；实际搜索范围与目标由游戏内雷达逻辑决定。"
+			]
+			tasks: [
+				{
+					id: "2000000000001010"
+					type: "item"
+					item: { id: "taovmodernnaval:radar_block", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002010", type: "xp", xp: 25 }
+			]
+		}
+		{
+			id: "2000000000000011"
+			title: "接入火控指挥"
+			x: 2.0d
+			y: 0.0d
+			dependencies: ["2000000000000010"]
+			description: [
+				"准备 P1 指挥仪与总控设备，建立从搜索到交战的火控链路。"
+				"任务只检查装备持有情况；放置、连接和选定目标需在游戏中完成。"
+			]
+			tasks: [
+				{
+					id: "2000000000001011"
+					type: "item"
+					item: { id: "taovmodernnaval:p1_director", Count: 1b }
+				}
+				{
+					id: "2000000000001012"
+					type: "item"
+					item: { id: "taovmodernnaval:total_control_block", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002011", type: "xp", xp: 35 }
+			]
+		}
+		{
+			id: "2000000000000012"
+			title: "火箭发射架"
+			x: 4.0d
+			y: -1.0d
+			dependencies: ["2000000000000011"]
+			description: [
+				"取得 RAK 发射架，作为独立的导弹发射平台。"
+				"按照发射架的实际操作方式装弹、接入火控并完成发射准备。"
+			]
+			tasks: [
+				{
+					id: "2000000000001013"
+					type: "item"
+					item: { id: "taovmodernnaval:rak_launcher", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002012", type: "xp", xp: 35 }
+			]
+		}
+		{
+			id: "2000000000000013"
+			title: "HML 垂直发射单元"
+			x: 4.0d
+			y: 1.0d
+			dependencies: ["2000000000000011"]
+			description: [
+				"HML 外形结构为 3 格宽、3 格长、6 格高；允许使用虚空方块填充结构。"
+			"HML 仅能装填本模组的反舰导弹。任务检查发射管物品，不会自动验证建造尺寸或装填状态。"
+			]
+			tasks: [
+				{
+					id: "2000000000001014"
+					type: "item"
+					item: { id: "taovmodernnaval:launch_tube", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002013", type: "xp", xp: 45 }
+			]
+		}
+		{
+			id: "2000000000000014"
+			title: "完成首次装填"
+			x: 6.0d
+			y: 0.0d
+			dependencies: ["2000000000000012", "2000000000000013"]
+			description: [
+				"P1 是入门级反舰导弹。先取得导弹与引信，再按发射系统的操作完成装填。"
+				"HML 只接受本模组的反舰导弹；发射前检查引信状态与安全距离。"
+			]
+			tasks: [
+				{
+					id: "2000000000001015"
+					type: "item"
+					item: { id: "taovmodernnaval:p1_missile", Count: 1b }
+				}
+				{
+					id: "2000000000001016"
+					type: "item"
+					item: { id: "taovmodernnaval:missile_fuze", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002014", type: "xp", xp: 50 }
+			]
+		}
+		{
+			id: "2000000000000015"
+			title: "轻型导弹序列"
+			x: 8.0d
+			y: 0.0d
+			dependencies: ["2000000000000014"]
+			description: [
+				"扩展轻型反舰弹药：P15 与 P30。"
+				"不同型号有各自的速度、转向、威力和搜索参数。"
+			]
+			tasks: [
+				{
+					id: "2000000000001017"
+					type: "item"
+					item: { id: "taovmodernnaval:p15_missile", Count: 1b }
+				}
+				{
+					id: "2000000000001018"
+					type: "item"
+					item: { id: "taovmodernnaval:p30_missile", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002015", type: "xp", xp: 60 }
+			]
+		}
+		{
+			id: "2000000000000016"
+			title: "中程打击能力"
+			x: 10.0d
+			y: 0.0d
+			dependencies: ["2000000000000015"]
+			description: [
+				"取得 P45、P100 与 P120，扩展舰艇的中程反舰弹药选择。"
+				"任务目标为取得各型号导弹，不要求消耗物品。"
+			]
+			tasks: [
+				{
+					id: "2000000000001019"
+					type: "item"
+					item: { id: "taovmodernnaval:p45_missile", Count: 1b }
+				}
+				{
+					id: "2000000000001020"
+					type: "item"
+					item: { id: "taovmodernnaval:p100_missile", Count: 1b }
+				}
+				{
+					id: "2000000000001021"
+					type: "item"
+					item: { id: "taovmodernnaval:p120_missile", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002016", type: "xp", xp: 75 }
+			]
+		}
+		{
+			id: "2000000000000017"
+			title: "远程反舰弹药"
+			x: 12.0d
+			y: 0.0d
+			dependencies: ["2000000000000016"]
+			description: [
+				"取得 P270 与 P300，继续扩展远程打击能力。"
+				"发射效果仍取决于目标指示、实际装填和导弹制导状态。"
+			]
+			tasks: [
+				{
+					id: "2000000000001022"
+					type: "item"
+					item: { id: "taovmodernnaval:p270_missile", Count: 1b }
+				}
+				{
+					id: "2000000000001023"
+					type: "item"
+					item: { id: "taovmodernnaval:p300_missile", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002017", type: "xp", xp: 90 }
+			]
+		}
+		{
+			id: "2000000000000018"
+			title: "重型反舰武器"
+			x: 14.0d
+			y: 0.0d
+			dependencies: ["2000000000000017"]
+			description: [
+				"取得 P500、P700 与 P800，完成本模组 P 系列导弹的收集。"
+				"P700 与 P800 具备主动搜索能力；仍应先建立雷达/火控目标指示。"
+			]
+			tasks: [
+				{
+					id: "2000000000001024"
+					type: "item"
+					item: { id: "taovmodernnaval:p500_missile", Count: 1b }
+				}
+				{
+					id: "2000000000001025"
+					type: "item"
+					item: { id: "taovmodernnaval:p700_missile", Count: 1b }
+				}
+				{
+					id: "2000000000001026"
+					type: "item"
+					item: { id: "taovmodernnaval:p800_missile", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002018", type: "xp", xp: 120 }
+			]
+		}
+		{
+			id: "2000000000000019"
+			title: "末端防空"
+			x: 2.0d
+			y: 3.0d
+			dependencies: ["2000000000000010"]
+			description: [
+				"部署 AK-630 近防炮与装甲方块，为舰艇补充末端防护。"
+				"本任务检查装备物品，不会自动验证炮塔朝向、供电或目标拦截。"
+			]
+			tasks: [
+				{
+					id: "2000000000001027"
+					type: "item"
+					item: { id: "taovmodernnaval:ak630", Count: 1b }
+				}
+				{
+					id: "2000000000001028"
+					type: "item"
+					item: { id: "taovmodernnaval:armor_block", Count: 1b }
+				}
+			]
+			rewards: [
+				{ id: "2000000000002019", type: "xp", xp: 60 }
+			]
+		}
+	]
+	quest_links: []
+}
