@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import TAOVMN.content.weapon.NavalLaunchBlockEntity;
 import TAOVMN.registry.ModBlockEntities;
@@ -61,6 +62,14 @@ public class TotalControlBlockEntity extends BlockEntity {
     private static final double DEFAULT_SCOPE_RANGE = 160.0D;
     private static final int TICK_WRAP = 120;
 
+    /** 允许下达界面指令的最大距离（格）。与容器交互距离同量级，防止客户端从任意位置伪造指令。 */
+    public static final double MAX_ORDER_DISTANCE = 8.0D;
+    /** 同一玩家两次界面指令之间的最小间隔（tick），抑制高频发包刷弹。 */
+    private static final int ORDER_COOLDOWN_TICKS = 4;
+    /** 频率记录表的清理阈值与过期时长（tick）。 */
+    private static final int ORDER_TICK_MAP_PRUNE_SIZE = 512;
+    private static final long ORDER_TICK_MAX_AGE = 200L;
+
     /** 请求发射（导弹）或开始交战（近防炮）。 */
     public static final int ACTION_FIRE = 0;
     /** 切换到下一个火力通道编组。 */
@@ -85,6 +94,8 @@ public class TotalControlBlockEntity extends BlockEntity {
     private final List<ScopeContact> contacts = new ArrayList<>();
     /** 玩家显式指定的编组：方块坐标 {@link BlockPos#asLong()} → 编组。 */
     private final Map<Long, FireChannelGroup> groupAssignments = new HashMap<>();
+    /** 玩家 UUID → 上次下达界面指令的 gameTime。仅服务端主线程访问，不需要并发容器。 */
+    private final Map<UUID, Long> lastOrderTicks = new HashMap<>();
 
     public TotalControlBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.TOTAL_CONTROL_BLOCK.get(), pos, state);
@@ -192,27 +203,52 @@ public class TotalControlBlockEntity extends BlockEntity {
 
     /** 处理一条来自界面的指令（服务端线程）。 */
     public void handleOrder(ServerPlayer player, BlockPos channelPos, int action) {
+        // 距离是权威校验：界面开着但人已走远、或客户端直接伪造坐标发包，都在这里挡掉
+        if (player.distanceToSqr(Vec3.atCenterOf(worldPosition)) > MAX_ORDER_DISTANCE * MAX_ORDER_DISTANCE) {
+            player.displayClientMessage(Component.translatable("message.taovmodernnaval.order_too_far"), true);
+            return;
+        }
+
+        long now = level == null ? 0L : level.getGameTime();
+        Long lastTick = lastOrderTicks.get(player.getUUID());
+        if (lastTick != null && now - lastTick < ORDER_COOLDOWN_TICKS) {
+            player.displayClientMessage(Component.translatable("message.taovmodernnaval.order_too_fast"), true);
+            return;
+        }
+        lastOrderTicks.put(player.getUUID(), now);
+        pruneOrderTicks(now);
+
         FireChannel channel = channelAt(channelPos);
         if (channel == null) {
             player.displayClientMessage(Component.translatable("message.taovmodernnaval.channel_missing"), true);
             return;
         }
 
-        if (action == ACTION_CYCLE_GROUP) {
-            cycleChannelGroup(channelPos);
-            FireChannel updated = channelAt(channelPos);
-            FireChannelGroup group = updated == null ? channel.group() : updated.group();
-            player.displayClientMessage(Component.translatable("message.taovmodernnaval.channel_group_set",
-                    Component.translatable(group.translationKey())), true);
+        switch (action) {
+            case ACTION_CYCLE_GROUP -> {
+                cycleChannelGroup(channelPos);
+                FireChannel updated = channelAt(channelPos);
+                FireChannelGroup group = updated == null ? channel.group() : updated.group();
+                player.displayClientMessage(Component.translatable("message.taovmodernnaval.channel_group_set",
+                        Component.translatable(group.translationKey())), true);
+            }
+            case ACTION_FIRE -> {
+                boolean fired = fireChannel(channelPos);
+                player.displayClientMessage(Component.translatable(fired
+                        ? "message.taovmodernnaval.channel_fired"
+                        : "message.taovmodernnaval.channel_fire_failed"), true);
+            }
+            default -> player.displayClientMessage(
+                    Component.translatable("message.taovmodernnaval.order_unknown_action"), true);
+        }
+    }
+
+    /** 频率记录表不随玩家 UUID 无界增长：超过阈值时清理过期条目。 */
+    private void pruneOrderTicks(long now) {
+        if (lastOrderTicks.size() <= ORDER_TICK_MAP_PRUNE_SIZE) {
             return;
         }
-
-        if (action == ACTION_FIRE) {
-            boolean fired = fireChannel(channelPos);
-            player.displayClientMessage(Component.translatable(fired
-                    ? "message.taovmodernnaval.channel_fired"
-                    : "message.taovmodernnaval.channel_fire_failed"), true);
-        }
+        lastOrderTicks.entrySet().removeIf(entry -> now - entry.getValue() > ORDER_TICK_MAX_AGE);
     }
 
     /** 对指定发射装置下达发射 / 交战命令。 @return 是否真的执行了动作 */

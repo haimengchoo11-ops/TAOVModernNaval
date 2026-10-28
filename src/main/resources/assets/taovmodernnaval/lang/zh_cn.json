@@ -113,5 +113,8 @@
     "message.taovmodernnaval.channel_missing": "该火力通道已不存在。",
     "message.taovmodernnaval.channel_group_set": "火力通道编组：%s",
     "message.taovmodernnaval.channel_fired": "火力通道已发射。",
-    "message.taovmodernnaval.channel_fire_failed": "发射失败：无弹药、目标不匹配或装置未就绪。"
+    "message.taovmodernnaval.channel_fire_failed": "发射失败：无弹药、目标不匹配或装置未就绪。",
+    "message.taovmodernnaval.order_too_far": "距离过远，无法操作总控台。",
+    "message.taovmodernnaval.order_too_fast": "操作过于频繁，请稍后再试。",
+    "message.taovmodernnaval.order_unknown_action": "未知的控制指令。"
 }
