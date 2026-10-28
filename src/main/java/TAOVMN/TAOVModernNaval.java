@@ -31,6 +31,10 @@ public class TAOVModernNaval {
      *
      * <p><b>恢复方式</b>：把这个常量改成 {@code true} 即可（{@link TAOVMN.client.ClientEvents}
      * 里的实体渲染器注册由同一个常量控制，不要只改一边，否则会为未注册的实体类型注册渲染器而崩溃）。
+     *
+     * <p>该层专属的 4 个配方与 4 个掉落表（{@code naval_core_block} / {@code naval_launch_tube} /
+     * {@code naval_turret} / {@code radar}）已随该层一起删除，因为它们引用的物品在停用后并不存在，
+     * 会在数据包加载时刷错误日志。恢复该层时需要从 git 历史（commit {@code efa4271} 之前）取回。
      */
     public static final boolean REWRITE_LAYER_ENABLED = false;
 
