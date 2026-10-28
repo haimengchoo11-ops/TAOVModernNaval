@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "taovmodernnaval:missile_fuze" },
+    { "item": "minecraft:iron_block" },
+    { "item": "minecraft:iron_block" },
+    { "item": "minecraft:diamond" },
+    { "item": "minecraft:diamond" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" }
+  ],
+  "result": {
+    "item": "taovmodernnaval:p300_missile",
+    "count": 1
+  }
+}

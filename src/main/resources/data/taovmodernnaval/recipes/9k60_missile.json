@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "taovmodernnaval:missile_fuze" },
+    { "item": "minecraft:iron_ingot" },
+    { "item": "minecraft:iron_ingot" },
+    { "item": "minecraft:iron_ingot" },
+    { "item": "minecraft:amethyst_shard" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" }
+  ],
+  "result": {
+    "item": "taovmodernnaval:9k60_missile",
+    "count": 2
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": ["IBI", "BFB", "IRI"],
+  "key": {
+    "R": { "item": "minecraft:redstone" },
+    "B": { "item": "minecraft:iron_block" },
+    "F": { "item": "taovmodernnaval:missile_fuze" },
+    "I": { "item": "minecraft:iron_ingot" }
+  },
+  "result": {
+    "item": "taovmodernnaval:rak_launcher",
+    "count": 1
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["IGI", "GRG", "IDI"],
+  "key": {
+    "G": { "item": "minecraft:gold_ingot" },
+    "R": { "item": "minecraft:redstone_block" },
+    "D": { "item": "taovmodernnaval:radar_block" },
+    "I": { "item": "minecraft:iron_ingot" }
+  },
+  "result": {
+    "item": "taovmodernnaval:p1_director",
+    "count": 1
+  }
+}

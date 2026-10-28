@@ -1,0 +1,15 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_the_recipe": {
+      "trigger": "minecraft:recipe_unlocked",
+      "conditions": { "recipe": "taovmodernnaval:armor_block" }
+    },
+    "has_ingredient": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [ { "items": [ "minecraft:obsidian" ] } ] }
+    }
+  },
+  "requirements": [ [ "has_the_recipe", "has_ingredient" ] ],
+  "rewards": { "recipes": [ "taovmodernnaval:armor_block" ] }
+}

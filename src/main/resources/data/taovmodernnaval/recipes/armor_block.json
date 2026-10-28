@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": ["III", "IOI", "III"],
+  "key": {
+    "O": { "item": "minecraft:obsidian" },
+    "I": { "item": "minecraft:iron_ingot" }
+  },
+  "result": {
+    "item": "taovmodernnaval:armor_block",
+    "count": 4
+  }
+}

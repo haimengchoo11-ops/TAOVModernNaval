@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": ["GGG", "OCO", "IBI"],
+  "key": {
+    "G": { "item": "minecraft:glass" },
+    "C": { "item": "minecraft:compass" },
+    "B": { "item": "minecraft:iron_block" },
+    "O": { "item": "minecraft:observer" },
+    "I": { "item": "minecraft:iron_ingot" }
+  },
+  "result": {
+    "item": "taovmodernnaval:radar_block",
+    "count": 1
+  }
+}

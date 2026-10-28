@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    { "item": "taovmodernnaval:missile_fuze" },
+    { "item": "minecraft:iron_block" },
+    { "item": "minecraft:iron_block" },
+    { "item": "minecraft:iron_block" },
+    { "item": "minecraft:netherite_scrap" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" }
+  ],
+  "result": {
+    "item": "taovmodernnaval:p700_missile",
+    "count": 1
+  }
+}
