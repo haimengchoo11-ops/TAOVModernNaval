@@ -4,9 +4,12 @@ import TAOVMN.entity.MissileFactory;
 import TAOVMN.entity.ShaoMissileProjectile;
 import TAOVMN.client.render.MissileItemRenderer;
 import TAOVMN.util.MissileProfile;
+import TAOVMN.util.WeaponSpec;
+import TAOVMN.util.WeaponSpecTable;
 import net.minecraft.core.Direction;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.network.chat.Component;
+import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraft.ChatFormatting;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -126,5 +129,22 @@ public class MissileItem extends Item implements GeoItem {
         tooltip.add(Component.translatable("tooltip.taovmodernnaval.target_domain")
                 .append(Component.literal("  "))
                 .append(Component.translatable(profile.domain().translationKey())));
+        WeaponSpec spec = lookupSpec(stack);
+        if (spec != null) {
+            tooltip.add(Component.translatable("tooltip.taovmodernnaval.real_model")
+                    .append(Component.literal("  " + spec.realDesignation()))
+                    .withStyle(ChatFormatting.GRAY));
+            if (!spec.verified()) {
+                tooltip.add(Component.translatable("tooltip.taovmodernnaval.data_pending")
+                        .append(Component.literal("  " + spec.dataNote()))
+                        .withStyle(ChatFormatting.DARK_GRAY));
+            }
+        }
+    }
+
+    /** 按物品注册路径查真实型号规格；非本模组反舰弹返回 {@code null}。 */
+    private static WeaponSpec lookupSpec(ItemStack stack) {
+        var key = ForgeRegistries.ITEMS.getKey(stack.getItem());
+        return key == null ? null : WeaponSpecTable.find(key.getPath());
     }
 }
