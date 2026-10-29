@@ -41,70 +41,77 @@ public record MissileProfile(
         return TAG_ROOT;
     }
 
+    // ---- 反舰弹：数值全部来自 WeaponSpecTable（真实数据 + 统一换算），此处不再手工排档 ----
+
     public static MissileProfile p1Default() {
-        return new MissileProfile(2.4F, 0.20F, 4.0F, 320.0F, 1.8F, 10.0F);
+        return WeaponSpecTable.profile("p1_missile");
     }
 
     public static MissileProfile p15() {
-        return new MissileProfile(2.48F, 0.24F, 6.0F, 340.0F, 1.8F, 10.0F);
+        return WeaponSpecTable.profile("p15_missile");
     }
 
+    /** 旧 id 保留，改挂 P-35「进步」（SS-N-3）。 */
     public static MissileProfile p30() {
-        return new MissileProfile(2.40F, 0.22F, 7.0F, 360.0F, 1.9F, 10.0F);
+        return WeaponSpecTable.profile("p30_missile");
     }
 
+    /** 旧 id 保留，改挂 P-70「紫晶」（SS-N-7）。 */
     public static MissileProfile p45() {
-        return new MissileProfile(2.32F, 0.20F, 8.0F, 380.0F, 2.0F, 10.0F);
+        return WeaponSpecTable.profile("p45_missile");
     }
 
+    /** 旧 id 保留，改挂 P-1000「火山」（SS-N-12B）。 */
     public static MissileProfile p100() {
-        return new MissileProfile(2.16F, 0.18F, 10.0F, 420.0F, 2.1F, 10.0F);
+        return WeaponSpecTable.profile("p100_missile");
     }
 
+    /** 旧 id 保留，改挂 3M-54「口径」（SS-N-27）。 */
     public static MissileProfile p300() {
-        return new MissileProfile(2.00F, 0.16F, 13.0F, 480.0F, 2.2F, 10.0F);
+        return WeaponSpecTable.profile("p300_missile");
     }
 
     public static MissileProfile p270() {
-        return new MissileProfile(2.04F, 0.17F, 12.0F, 460.0F, 2.2F, 10.0F);
+        return WeaponSpecTable.profile("p270_missile");
     }
 
     public static MissileProfile p500() {
-        return new MissileProfile(1.88F, 0.15F, 16.0F, 560.0F, 2.4F, 10.0F);
+        return WeaponSpecTable.profile("p500_missile");
     }
 
     public static MissileProfile p700() {
-        return new MissileProfile(1.76F, 0.14F, 20.0F, 640.0F, 2.6F, 10.0F);
+        return WeaponSpecTable.profile("p700_missile");
     }
 
     public static MissileProfile p120() {
-        return new MissileProfile(2.36F, 0.21F, 7.5F, 400.0F, 1.9F, 10.0F);
+        return WeaponSpecTable.profile("p120_missile");
     }
 
     public static MissileProfile p800() {
-        return new MissileProfile(1.80F, 0.14F, 22.0F, 720.0F, 2.7F, 10.0F);
+        return WeaponSpecTable.profile("p800_missile");
     }
 
     // ---- 防空弹（目标域 = ANTI_AIR；高速度、高转向、小当量、以近炸为主）----
+    // 防空弹的杀伤机理是破片，不套用反舰弹的「战斗部/45」当量换算，参数仍按手感维护。
 
-    /** S-300 的 5V55RM：远程舰空弹。 */
+    /** S-300F 的 5V55RM：远程舰空弹。射程未核实，保留原档位。 */
     public static MissileProfile s300() {
         return new MissileProfile(3.20F, 0.44F, 6.0F, 260.0F, 4.0F, 12.0F, TargetDomain.ANTI_AIR);
     }
 
-    /** 9K33「黄蜂」：近程舰空弹，转向最快。 */
+    /** 4K33 Osa-M 的 9M33M3：15 km / 12 km 射高，转向最快。射程按换算表落到下限档。 */
     public static MissileProfile nineK33() {
-        return new MissileProfile(2.90F, 0.52F, 3.5F, 150.0F, 3.0F, 10.0F, TargetDomain.ANTI_AIR);
+        return new MissileProfile(2.75F, 0.52F, 3.5F, 120.0F, 3.0F, 10.0F, TargetDomain.ANTI_AIR);
     }
 
-    /** 9K60：近程舰空弹。 */
+    /** 9M33M1（Osa 早期弹）：近程舰空弹，弹型编号沿用旧 id。 */
     public static MissileProfile nineK60() {
-        return new MissileProfile(2.70F, 0.55F, 3.0F, 130.0F, 3.0F, 10.0F, TargetDomain.ANTI_AIR);
+        return new MissileProfile(2.60F, 0.55F, 3.0F, 120.0F, 3.0F, 10.0F, TargetDomain.ANTI_AIR);
     }
 
-    /** 9M38「山毛榉」：中程舰空弹。 */
+    /** Shtil-1 的 9M317ME：2.5–50 km、5 m–15 km 射高、62 kg 战斗部（旧 id 保留）。 */
     public static MissileProfile nineM38() {
-        return new MissileProfile(3.00F, 0.46F, 4.5F, 200.0F, 3.5F, 12.0F, TargetDomain.ANTI_AIR);
+        return new MissileProfile(3.00F, 0.46F, 4.5F, 260.0F, 3.5F, 12.0F, TargetDomain.ANTI_AIR);
     }
 
     public static MissileProfile resolve(ItemStack stack) {
