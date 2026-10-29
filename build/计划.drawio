@@ -1,0 +1,64 @@
+<mxfile host="Electron">
+  <diagram name="第 1 页" id="Pba0FUzN6vN3lz4Y3_zP">
+    <mxGraphModel dx="920" dy="595" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-1" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=50;horizontalStack=0;rounded=1;fontSize=14;fontStyle=0;strokeWidth=2;resizeParent=0;resizeLast=1;shadow=0;dashed=0;align=center;arcSize=4;whiteSpace=wrap;html=1;" value="预警/搜索雷达" vertex="1">
+          <mxGeometry height="120" width="160" x="310" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-2" parent="yjE5kh3t5hX3lfogQw3i-1" style="align=left;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;fontSize=12;verticalAlign=top;resizable=0;rotatable=0;part=1;html=1;whiteSpace=wrap;" value="+搜索范围&lt;div&gt;+搜索频率&lt;/div&gt;&lt;div&gt;+名称检索&lt;/div&gt;&lt;div&gt;+敌我识别&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="160" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-3" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=50;horizontalStack=0;rounded=1;fontSize=14;fontStyle=0;strokeWidth=2;resizeParent=0;resizeLast=1;shadow=0;dashed=0;align=center;arcSize=4;whiteSpace=wrap;html=1;" value="火控雷达" vertex="1">
+          <mxGeometry height="120" width="160" x="500" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-4" parent="yjE5kh3t5hX3lfogQw3i-3" style="align=left;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;fontSize=12;verticalAlign=top;resizable=0;rotatable=0;part=1;html=1;whiteSpace=wrap;" value="引导数量&lt;div&gt;锁定数量&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="160" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-5" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=50;horizontalStack=0;rounded=1;fontSize=14;fontStyle=0;strokeWidth=2;resizeParent=0;resizeLast=1;shadow=0;dashed=0;align=center;arcSize=4;whiteSpace=wrap;html=1;" value="导弹" vertex="1">
+          <mxGeometry height="140" width="160" x="60" y="270" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-6" parent="yjE5kh3t5hX3lfogQw3i-5" style="align=left;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;fontSize=12;verticalAlign=top;resizable=0;rotatable=0;part=1;html=1;whiteSpace=wrap;" value="+弹速&lt;br&gt;+机动角度&lt;div&gt;+导弹寿命&lt;/div&gt;&lt;div&gt;+引信&lt;/div&gt;&lt;div&gt;+当量&lt;/div&gt;" vertex="1">
+          <mxGeometry height="90" width="160" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-12" parent="1" style="swimlane;childLayout=stackLayout;horizontal=1;startSize=50;horizontalStack=0;rounded=1;fontSize=14;fontStyle=0;strokeWidth=2;resizeParent=0;resizeLast=1;shadow=0;dashed=0;align=center;arcSize=4;whiteSpace=wrap;html=1;" value="重型导弹" vertex="1">
+          <mxGeometry height="120" width="160" x="60" y="480" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-13" parent="yjE5kh3t5hX3lfogQw3i-12" style="align=left;strokeColor=none;fillColor=none;spacingLeft=4;spacingRight=4;fontSize=12;verticalAlign=top;resizable=0;rotatable=0;part=1;html=1;whiteSpace=wrap;" value="锁定范围：默认30&lt;div&gt;引导刷新&lt;/div&gt;" vertex="1">
+          <mxGeometry height="70" width="160" y="50" as="geometry" />
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-14" edge="1" parent="1" source="yjE5kh3t5hX3lfogQw3i-12" style="endArrow=block;endSize=16;endFill=0;html=1;rounded=0;" target="yjE5kh3t5hX3lfogQw3i-5" value="Extends">
+          <mxGeometry relative="1" width="160" as="geometry">
+            <mxPoint x="100" y="410" as="sourcePoint" />
+            <mxPoint x="260" y="410" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-15" edge="1" parent="1" source="yjE5kh3t5hX3lfogQw3i-3" style="endArrow=block;endSize=16;endFill=0;html=1;rounded=0;" target="yjE5kh3t5hX3lfogQw3i-1" value="Extends">
+          <mxGeometry relative="1" width="160" as="geometry">
+            <mxPoint x="330" y="310" as="sourcePoint" />
+            <mxPoint x="490" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-16" edge="1" parent="1" source="yjE5kh3t5hX3lfogQw3i-3" style="html=1;verticalAlign=bottom;endArrow=block;curved=0;rounded=0;" target="yjE5kh3t5hX3lfogQw3i-5" value="引导">
+          <mxGeometry relative="1" width="80" as="geometry">
+            <mxPoint x="370" y="310" as="sourcePoint" />
+            <mxPoint x="450" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-17" edge="1" parent="1" source="yjE5kh3t5hX3lfogQw3i-5" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERoneToMany;rounded=0;" target="yjE5kh3t5hX3lfogQw3i-4" value="">
+          <mxGeometry height="100" relative="1" width="100" as="geometry">
+            <mxPoint x="360" y="360" as="sourcePoint" />
+            <mxPoint x="460" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yjE5kh3t5hX3lfogQw3i-18" edge="1" parent="1" source="yjE5kh3t5hX3lfogQw3i-3" style="edgeStyle=entityRelationEdgeStyle;fontSize=12;html=1;endArrow=ERmandOne;startArrow=ERmandOne;rounded=0;" target="yjE5kh3t5hX3lfogQw3i-2" value="">
+          <mxGeometry height="100" relative="1" width="100" as="geometry">
+            <mxPoint x="360" y="360" as="sourcePoint" />
+            <mxPoint x="460" y="260" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
